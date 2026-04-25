@@ -1,0 +1,36 @@
+{
+  "_comment": "ハーマイオニーのリサーチ設定。あなたのThreadsアカウントのジャンルに合わせて自由に変更してください。",
+  "_howto": "変更後はClaude Codeを再起動するか、次回の /run-daily-cycle から自動で反映されます。",
+
+  "topic_genre": "AI副業・主婦向けAI活用",
+
+  "youtube_channel_ids": [
+    "UCfapRkagDtoQEkGeyD3uERQ",
+    "UCboaqA4fwGpljEKeUjO1iVQ",
+    "UCopTsucSPUP_N5n4fcLQtXQ",
+    "UCvHpETRVi1tXeRJoYiXHJqw",
+    "UCZQVTC3uLCyuJUOcRlguazA"
+  ],
+  "_youtube_channel_notes": [
+    "KEITO【AI&WEB ch】",
+    "SHIFT AI ニュース",
+    "ここなのAI大学",
+    "まさおAIじっくり解説ch",
+    "にゃんたのAIチャンネル"
+  ],
+
+  "youtube_keywords": [
+    "AI 主婦 副業 始め方",
+    "ChatGPT 主婦 活用 初心者",
+    "AI副業 在宅 稼ぎ方",
+    "AI 初心者 使い方 わかりやすい",
+    "主婦 在宅ワーク AI時短"
+  ],
+
+  "rss_feeds": [
+    "https://feeds.feedburner.com/oreilly/radar",
+    "https://machinelearningmastery.com/feed/",
+    "https://venturebeat.com/category/ai/feed/",
+    "https://www.marktechpost.com/feed/"
+  ]
+}
