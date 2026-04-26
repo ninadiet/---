@@ -33,6 +33,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
+      - name: Restore auth credentials
+        run: |
+          mkdir -p operation/auth
+          echo "${{ secrets.HOG_ACCESS_KEY }}" | base64 -d > operation/auth/access_HOG-2026-04.key
+
       - name: Check if today already completed
         id: skip_check
         env:
