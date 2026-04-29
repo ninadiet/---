@@ -33,6 +33,11 @@ jobs:
           cd scripts
           pip install -r requirements.txt
 
+      - name: Restore auth credentials
+        run: |
+          mkdir -p operation/auth
+          echo "${{ secrets.HOG_ACCESS_KEY }}" | base64 -d > operation/auth/access_HOG-2026-04.key
+
       - name: Step 6 - Ron Fetches Engagement Data
         env:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
