@@ -29,6 +29,11 @@ jobs:
           cd scripts
           pip install -r requirements.txt
 
+      - name: Restore auth credentials
+        run: |
+          mkdir -p operation/auth
+          echo "${{ secrets.HOG_ACCESS_KEY }}" | base64 -d > operation/auth/access_HOG-2026-04.key
+
       - name: Snape - Generate Weekly Report
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
