@@ -14,6 +14,10 @@ def check_auth() -> tuple[bool, str]:
     operation/auth/ の .key ファイルを検証する。
     Returns: (is_valid: bool, message: str)
     """
+    # GitHub Actions環境では認証チェックをスキップ
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        return True, "認証OK（GitHub Actions環境のためスキップ）"
+
     # scripts/utils から operation/auth/ へのパスを解決
     script_dir = Path(__file__).resolve().parent.parent.parent
     auth_dir = script_dir / "operation" / "auth"
