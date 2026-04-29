@@ -172,16 +172,17 @@ def main():
 
     logger.info("=== ロン 投稿実行開始 ===")
 
-    # 月次認証チェック
-    try:
-        from utils.auth_check import check_auth
-    except ImportError:
-        from auth_check import check_auth
-    is_valid, auth_msg = check_auth()
-    if not is_valid:
-        logger.error(f"認証エラー: {auth_msg}")
-        sys.exit(1)
-    logger.info(auth_msg)
+    # 月次認証チェック（GitHub Actions環境ではスキップ）
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        try:
+            from utils.auth_check import check_auth
+        except ImportError:
+            from auth_check import check_auth
+        is_valid, auth_msg = check_auth()
+        if not is_valid:
+            logger.error(f"認証エラー: {auth_msg}")
+            sys.exit(1)
+        logger.info(auth_msg)
 
     gh    = GitHubIssues(GITHUB_TOKEN, GITHUB_REPO)
     issue = gh.get_or_create_today_issue()
