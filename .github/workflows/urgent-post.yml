@@ -34,7 +34,7 @@ jobs:
       - name: Restore auth credentials
         run: |
           mkdir -p operation/auth
-          echo "${{ secrets.HOG_ACCESS_KEY }}" | base64 -d > operation/auth/access_HOG-2026-04.key
+          echo "${{ secrets.HOG_ACCESS_KEY }}" | base64 -d > operation/auth/access_HOG-2026-05.key
 
       - name: Run urgent post
         env:
