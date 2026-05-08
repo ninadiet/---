@@ -64,6 +64,10 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: cd scripts && python hermione_research.py --theme "${{ github.event.inputs.theme }}"
 
+      - name: Wait for GitHub API to index new Issue
+        if: steps.skip_check.outputs.should_run != 'SKIP'
+        run: sleep 60
+
       - name: Step 3-4 - Luna & Malfoy (auto-retry)
         if: steps.skip_check.outputs.should_run != 'SKIP'
         env:
