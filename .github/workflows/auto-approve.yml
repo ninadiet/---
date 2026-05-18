@@ -1,0 +1,45 @@
+name: Auto Approve Daily Post
+
+# daily-cycleの完了後（毎朝9時）に自動で承認コメントを投稿する
+on:
+  schedule:
+    - cron: '0 0 * * *'   # JST 09:00（daily-cycle完了後）
+    - cron: '0 1 * * *'   # JST 10:00（予備・daily-cycle遅延時）
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Auto approve today's daily post
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TODAY=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+          ISSUE_NUM=$(gh api "repos/${{ github.repository }}/issues?labels=daily-operation&state=all&per_page=10" \
+            --jq ".[] | select(.title | contains(\"$TODAY\")) | .number" 2>/dev/null | head -1)
+          if [ -z "$ISSUE_NUM" ]; then
+            echo "⚠️ Issue for $TODAY not found. daily-cycle may not have run yet."
+            exit 1
+          fi
+          # すでに投稿済みかチェック（重複防止）
+          ALREADY=$(gh api "repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
+            --jq ".[] | select(.body | contains(\"投稿完了\")) | .id" 2>/dev/null | head -1)
+          if [ -n "$ALREADY" ]; then
+            echo "✅ Already posted today. Skipping."
+            exit 0
+          fi
+          # 校閲（承認申請）完了チェック
+          HAS_REVIEW=$(gh api "repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
+            --jq ".[] | select(.body | contains(\"承認申請\")) | .id" 2>/dev/null | head -1)
+          if [ -z "$HAS_REVIEW" ]; then
+            echo "⚠️ Review not completed yet. daily-cycle may still be running."
+            exit 1
+          fi
+          gh issue comment $ISSUE_NUM --repo "${{ github.repository }}" --body "承認"
+          echo "✅ Auto-approved Issue #$ISSUE_NUM for $TODAY"
