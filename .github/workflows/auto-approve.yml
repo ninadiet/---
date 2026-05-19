@@ -1,10 +1,14 @@
 name: Auto Approve Daily Post
 
-# daily-cycleの完了後（毎朝9時）に自動で承認コメントを投稿する
+# daily-cycleの完了後に自動で承認コメントを投稿する
 on:
   schedule:
-    - cron: '0 0 * * *'   # JST 09:00（daily-cycle完了後）
-    - cron: '0 1 * * *'   # JST 10:00（予備・daily-cycle遅延時）
+    - cron: '30 21 * * *'  # JST 06:30（最早・ライター完了直後）
+    - cron: '0 22 * * *'   # JST 07:00
+    - cron: '30 22 * * *'  # JST 07:30
+    - cron: '0 23 * * *'   # JST 08:00
+    - cron: '0 0 * * *'    # JST 09:00（バックアップ）
+    - cron: '0 1 * * *'    # JST 10:00（バックアップ）
   workflow_dispatch: {}
 
 permissions:
