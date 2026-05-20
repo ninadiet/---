@@ -1,0 +1,113 @@
+name: Scheduled Post SLOT_1 (07:00 JST)
+
+# approve-and-post.yml（手動承認）と共存する設計。
+# GITHUB_TOKENのコメントがissue_commentをトリガーできないGitHub仕様を回避するため
+# スケジュール型に変更。
+on:
+  schedule:
+    - cron: '0 22 * * *'   # 07:00 JST（最早）
+    - cron: '30 22 * * *'  # 07:30 JST
+    - cron: '0 23 * * *'   # 08:00 JST（理想）
+    - cron: '30 23 * * *'  # 08:30 JST
+    - cron: '0 0 * * *'    # 09:00 JST（バックアップ）
+    - cron: '0 1 * * *'    # 10:00 JST（最終バックアップ）
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  scheduled-post-slot1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Restore auth credentials
+        run: |
+          mkdir -p operation/auth
+          echo "${{ secrets.HOG_ACCESS_KEY }}" | base64 -d > operation/auth/access_HOG-2026-05.key
+
+      - name: Check if SLOT_1 already posted
+        id: posted_check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          JST_HOUR=$(TZ=Asia/Tokyo date +%H)
+          JST_MIN=$(TZ=Asia/Tokyo date +%M)
+          CURRENT=$((10#$JST_HOUR * 60 + 10#$JST_MIN))
+          WINDOW_START=$((7 * 60 + 30))    # 07:30 JST（最早投稿許容）
+          WINDOW_END=$((11 * 60 + 0))      # 11:00 JST（最遅投稿許容）
+          MAX_LATE=$((11 * 60 + 30))       # 11:30 JST（workflow_dispatch許容上限）
+
+          if [ "${{ github.event_name }}" = "schedule" ] && ([ "$CURRENT" -lt "$WINDOW_START" ] || [ "$CURRENT" -gt "$WINDOW_END" ]); then
+            echo "should_run=SKIP" >> "$GITHUB_OUTPUT"
+            echo "Current JST time (${JST_HOUR}:${JST_MIN}) is outside 07:30-11:00 window. Skipping."
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$CURRENT" -gt "$MAX_LATE" ]; then
+            echo "should_run=SKIP" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch at ${JST_HOUR}:${JST_MIN} is too late (>11:30). Skipping."
+            exit 0
+          fi
+
+          TODAY=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+          ISSUE_NUMBER=$(gh api "repos/${{ github.repository }}/issues?labels=daily-operation&state=all&per_page=5" \
+            --jq ".[] | select(.title | contains(\"$TODAY\")) | .number" 2>/dev/null | head -1 || echo "")
+
+          if [ -z "$ISSUE_NUMBER" ]; then
+            echo "should_run=SKIP" >> "$GITHUB_OUTPUT"
+            echo "No issue found for today. Daily cycle may not have run yet."
+            exit 0
+          fi
+
+          # 承認申請が完了しているか確認
+          HAS_REVIEW=$(gh api "repos/${{ github.repository }}/issues/${ISSUE_NUMBER}/comments" \
+            --jq ".[] | select(.body | contains(\"承認申請\")) | .id" \
+            2>/dev/null | head -1 || echo "")
+          if [ -z "$HAS_REVIEW" ]; then
+            echo "should_run=SKIP" >> "$GITHUB_OUTPUT"
+            echo "Review (承認申請) not completed yet. Skipping."
+            exit 0
+          fi
+
+          # SLOT_1 投稿済みチェック（SLOT_2/3 の完了コメントと区別）
+          POSTED=$(gh api "repos/${{ github.repository }}/issues/${ISSUE_NUMBER}/comments" \
+            --jq ".[] | select(.body | contains(\"投稿完了\")) | select((.body | contains(\"18時\") | not) and (.body | contains(\"21時\") | not)) | .id" \
+            2>/dev/null | head -1 || echo "")
+          if [ -n "$POSTED" ]; then
+            echo "should_run=SKIP" >> "$GITHUB_OUTPUT"
+            echo "SLOT_1 already posted today - skipping."
+            exit 0
+          fi
+
+          echo "should_run=RUN" >> "$GITHUB_OUTPUT"
+          echo "SLOT_1 not posted yet - running."
+
+      - name: Post SLOT_1
+        if: steps.posted_check.outputs.should_run != 'SKIP'
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+        run: |
+          if [ -n "$GOOGLE_CREDENTIALS_JSON" ]; then
+            mkdir -p credentials
+            echo "$GOOGLE_CREDENTIALS_JSON" > credentials/sheets_service_account.json
+            export GOOGLE_CREDENTIALS_PATH=credentials/sheets_service_account.json
+          fi
+          python scripts/ron_scheduled_post.py --slot 1
