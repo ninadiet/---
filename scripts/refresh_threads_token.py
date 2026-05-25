@@ -43,19 +43,10 @@ def update_github_secret(new_token: str):
         logger.info("手動でGitHub Secrets を更新してください: THREADS_ACCESS_TOKEN")
         return
 
-    from github import Github
-    g    = Github(GITHUB_TOKEN)
-    repo = g.get_repo(GITHUB_REPO)
-
-    try:
-        # GitHub Secrets はAPIで更新可能（要admin権限）
-        # 暗号化が必要なため libsodium が必要 → 手動更新を案内
-        logger.info("GitHub Secretsの自動更新には追加ライブラリが必要です。")
-        logger.info("以下の手順で手動更新してください:")
-        logger.info(f"  1. https://github.com/{GITHUB_REPO}/settings/secrets/actions")
-        logger.info(f"  2. THREADS_ACCESS_TOKEN を新しい値に更新")
-    except Exception as e:
-        logger.error(f"GitHub Secret更新エラー: {e}")
+    logger.info("GitHub Secretsの自動更新には追加ライブラリが必要です。")
+    logger.info("以下の手順で手動更新してください:")
+    logger.info(f"  1. https://github.com/{GITHUB_REPO}/settings/secrets/actions")
+    logger.info(f"  2. THREADS_ACCESS_TOKEN を新しい値に更新")
 
 
 def main():
@@ -89,14 +80,9 @@ def main():
 
     # 新トークンをファイルに出力（GitHub Actions で使用）
     token_path = "new_token.txt"
-    try:
-        with open(token_path, "w") as f:
-            f.write(new_token)
-        logger.info("new_token.txt に保存しました（GitHub Actionsが読み取ります）")
-    finally:
-        # ローカル実行時は即座に削除（GitHub Actions上ではworkflow側でrm -fする）
-        import atexit
-        atexit.register(lambda: os.path.exists(token_path) and os.remove(token_path))
+    with open(token_path, "w") as f:
+        f.write(new_token)
+    logger.info("new_token.txt に保存しました（GitHub Actionsが読み取ります）")
     logger.info("=== リフレッシュ完了 ===")
 
 

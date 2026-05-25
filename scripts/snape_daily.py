@@ -37,7 +37,7 @@ THREADS_ACCESS_TOKEN = os.getenv("THREADS_ACCESS_TOKEN")
 THREADS_USER_ID      = os.getenv("THREADS_USER_ID")
 SPREADSHEET_ID       = os.getenv("SPREADSHEET_ID", "")
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/sheets_service_account.json")
-GEMINI_MODEL         = "gemini-2.0-flash"
+GEMINI_MODEL         = "gemini-2.0-flash-lite"
 THREADS_API_BASE     = "https://graph.threads.net/v1.0"
 
 SCRIPT_DIR          = os.path.dirname(os.path.abspath(__file__))
