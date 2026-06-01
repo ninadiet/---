@@ -17,6 +17,14 @@ from loguru import logger
 
 load_dotenv()
 
+from utils.auth_check import check_auth
+
+_auth_ok, _auth_msg = check_auth()
+if not _auth_ok:
+    import sys as _sys
+    print(f"[認証失敗] {_auth_msg}", file=_sys.stderr)
+    _sys.exit(1)
+
 GEMINI_API_KEY      = os.getenv("GEMINI_API_KEY")
 GITHUB_TOKEN        = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO         = os.getenv("GITHUB_REPO")
@@ -116,6 +124,34 @@ def generate_posts(briefing: str, voice_def: str, ref_posts: str, malfoy_feedbac
 - 「皆さん」は使用禁止。「みんな」を使うこと
 - 「〜してください」「〜しませんか」等の丁寧語は使用禁止
 - *（アスタリスク）は使用禁止。強調は「」を使うこと
+
+■ 【最重要】必勝8ステップ構造（実証パターン）
+詳細は operation/knowledge/_universal_post_playbook.md 参照
+
+3スロット教育型は以下の構造を厳守：
+
+【1/3 メイン】
+- Step 1. 引用フック『○○』（読者の心の声）
+- Step 2. 数字権威「○年、○○人見てきて」
+- Step 3. 結果先出し「○○が1つだけあった」
+
+【2/3 リプ1】
+- Step 4. 答えは1つだけ『○○』
+- Step 5. 理由＋なぜ効くか（短く）
+- Step 6. 逆ケース対比「逆に○○な人は」
+
+【3/3 リプ2】
+- Step 7. 自分の実践（家・現場・自分の体験）
+- Step 8. 低コストCTA「今日1回だけ試してみて✨」
+
+■ 数字権威の使い分け
+- 個別経験（深い）→ 「○○年、○○人を担当してきて」
+- 広域観察（広い）→ 「○○年、○○人見てきて」
+- 現場頻度（日常）→ 「毎日○○人にやってる現場で」
+
+■ CTA設計
+CTA は operation/knowledge/_purpose_cta_guide.md の6パターンを使い分け。
+アカウントの目的（サービス集客/コミュニティ/イベント等）に応じたパターンを選択。
 """
 
     feedback_section = f"""

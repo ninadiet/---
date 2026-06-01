@@ -23,6 +23,14 @@ from loguru import logger
 
 load_dotenv()
 
+from utils.auth_check import check_auth
+
+_auth_ok, _auth_msg = check_auth()
+if not _auth_ok:
+    import sys as _sys
+    print(f"[認証失敗] {_auth_msg}", file=_sys.stderr)
+    _sys.exit(1)
+
 THREADS_ACCESS_TOKEN    = os.getenv("THREADS_ACCESS_TOKEN")
 THREADS_USER_ID         = os.getenv("THREADS_USER_ID")
 GITHUB_TOKEN            = os.getenv("GITHUB_TOKEN")

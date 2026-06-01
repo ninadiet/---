@@ -701,9 +701,14 @@ Google Apps Script（無料）で時刻トリガーを設定すると、
 添付ファイルの種類を自動判定して適切に処理する：
 
 **パターン1：`access_HOG-YYYY-MM.key` ファイルの場合**
-- `operation/auth/` フォルダに保存
-- ファイルを読み込んで valid_until を確認
-- 「✅ トークンを更新しました。有効期限：XXXX年XX月XX日まで」と表示
+1. `operation/auth/` フォルダに保存
+2. ファイルを読み込んで valid_until を確認
+3. ファイルの1行目（トークン文字列）を取り出す
+4. GitHub Secret を更新する：
+   Bash で以下を実行：
+   TOKEN=$(head -1 operation/auth/access_HOG-*.key | tr -d '[:space:]')
+   gh secret set HOG_MONTHLY_TOKEN --body "$TOKEN"
+5. 「✅ トークンを更新しました。有効期限：XXXX / GitHub Secret も更新しました」と表示
 
 **パターン2：`kb_update_YYYYMM_*.md` ファイルの場合（コンテンツパック）**
 - ファイル冒頭の `update_type:` を読んで処理方法を判断

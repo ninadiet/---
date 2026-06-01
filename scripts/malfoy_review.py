@@ -18,6 +18,14 @@ from loguru import logger
 
 load_dotenv()
 
+from utils.auth_check import check_auth
+
+_auth_ok, _auth_msg = check_auth()
+if not _auth_ok:
+    import sys as _sys
+    print(f"[認証失敗] {_auth_msg}", file=_sys.stderr)
+    _sys.exit(1)
+
 GEMINI_API_KEY      = os.getenv("GEMINI_API_KEY")
 GITHUB_TOKEN        = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO         = os.getenv("GITHUB_REPO")
@@ -25,12 +33,46 @@ DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 MAX_RETRY      = 2   # 差し戻し最大回数
 
 
-FORBIDDEN_CHARS = ['*', '"', "'", '“', '”', '‘', '’', '`']
+FORBIDDEN_CHARS = [‘*’, ‘”’, “’”, ‘”’, ‘”’, ‘’’, ‘’’, ‘`’]
+
+URGENCY_NG_PATTERNS = [
+    r”\d+/\d+.*セール”, r”\d+月\d+日まで”,
+    r”明後日まで”, r”明日まで”, r”\d+日後”,
+    r”今すぐ買”, r”急いで”, r”在庫切れ.*前に”,
+    r”気になる人はチェック”,
+    r”DMで聞かれたので置いとくね”,
+    r”絶対買って”, r”リピート確定”,
+    r”ぜひフォローしてください”,
+    r”登録しないと損”,
+]
+
+RUDE_NG_PATTERNS = [
+    r”いいから片せ”, r”入れろや”, r”知らんが”,
+    r”うるさい”, r”黙れ”,
+]
 
 
 def find_forbidden_chars(text: str) -> list[str]:
     """投稿テキストに禁止文字が含まれるか確認する"""
     return [c for c in FORBIDDEN_CHARS if c in text]
+
+
+def check_urgency_ng(text: str) -> list[str]:
+    """焦らせ・押し付け表現のNGチェック"""
+    violations = []
+    for pattern in URGENCY_NG_PATTERNS:
+        if re.search(pattern, text):
+            violations.append(f"NGパターン検出: {pattern}")
+    return violations
+
+
+def check_rude_tone(text: str) -> list[str]:
+    """乱暴・命令調表現のNGチェック"""
+    violations = []
+    for pattern in RUDE_NG_PATTERNS:
+        if re.search(pattern, text):
+            violations.append(f"乱暴表現検出: {pattern}")
+    return violations
 
 
 def get_luna_posts(issue_number: int, gh: GitHubIssues) -> str:
@@ -91,6 +133,13 @@ def review_posts(posts_text: str) -> str:
 4. *（アスタリスク）が含まれている
 5. 誤情報・誹謗中傷・規約違反
 6. CTAに「何を届けるか」の価値提示がない
+7. 必勝テンプレ準拠チェック（教育型投稿の場合）: 以下6項目のうち4項目以上欠けていたら差し戻し
+   - 引用フック『○○』が含まれているか
+   - 数字（年数・人数）が含まれているか
+   - 「1つだけ」「1つあった」フレーズが含まれているか
+   - 「逆に」対比が含まれているか
+   - 自分の実践（家・現場・自分の体験）が含まれているか
+   - CTA「○日だけ」「○回だけ」が含まれているか
 
 ## 合格基準
 - 声定義の語尾（「〜だよ」「〜んだ」「〜のさ」「〜よね」「〜さ」）が使われていればOK
@@ -177,6 +226,16 @@ def main():
             logger.warning(f"禁止文字を検出: {chars_str} → 自動差し戻し")
             gh.update_pipeline_status(issue.number, "malfoy", "rejected")
             gh.add_comment(issue.number, f"## 🎩 {_n('malfoy')}より：差し戻し（禁止文字検出）\n\n**審査日時:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n禁止文字が含まれています: {chars_str}\n\n強調には `**` ではなく「」を使うこと。ルーナに修正させます。")
+            sys.exit(10)
+
+        urgency_violations = check_urgency_ng(luna_posts)
+        rude_violations = check_rude_tone(luna_posts)
+        if urgency_violations or rude_violations:
+            all_violations = urgency_violations + rude_violations
+            violations_str = "\n".join(all_violations)
+            logger.warning(f"NGパターンを検出: {violations_str} → 自動差し戻し")
+            gh.update_pipeline_status(issue.number, "malfoy", "rejected")
+            gh.add_comment(issue.number, f"## 🎩 {_n('malfoy')}より：差し戻し（NGパターン検出）\n\n**審査日時:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n以下のNGパターンが検出されました：\n{violations_str}\n\nルーナに修正させます。")
             sys.exit(10)
 
         review_result = review_posts(luna_posts)
