@@ -33,7 +33,7 @@ DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 MAX_RETRY      = 2   # 差し戻し最大回数
 
 
-FORBIDDEN_CHARS = [‘*’, ‘”’, “’”, ‘”’, ‘”’, ‘’’, ‘’’, ‘`’]
+FORBIDDEN_CHARS = ['*', '"', "'", '\u201c', '\u201d', '\u2018', '\u2019', '`']
 
 URGENCY_NG_PATTERNS = [
     r”\d+/\d+.*セール”, r”\d+月\d+日まで”,
