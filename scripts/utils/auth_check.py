@@ -111,30 +111,7 @@ def check_auth() -> tuple[bool, str]:
             "operation/auth/ フォルダに入れてください。"
         )
 
-    # ── pack_ref と sys_ver の整合性チェック ─────────────────────────
-    # 月次更新パックを適用していない退会メンバーは、ここで停止する。
-    pack_ref = kv.get("pack_ref", "")
-    if pack_ref:
-        sys_ver_lock = script_dir / "SYS_VER_LOCK.md"
-        if sys_ver_lock.exists():
-            try:
-                lock_content = sys_ver_lock.read_text(encoding="utf-8")
-                m_ver = re.search(r"sys_ver:\s*(\S+)", lock_content)
-                if m_ver:
-                    sys_ver = m_ver.group(1)
-                    if pack_ref != sys_ver:
-                        return False, (
-                            f"月次トークンのバージョン（{pack_ref}）と"
-                            f"インストール済みシステム（{sys_ver}）が一致しません。\n"
-                            "最新の月次更新パックを適用してから再起動してください。\n"
-                            "コミュニティ管理者から最新の更新ZIPを受け取り、"
-                            "fix_YYYYMM.py と auth_fix_YYYYMM.py を実行してください。"
-                        )
-            except Exception:
-                pass  # 読み取り失敗時はスキップ（後方互換性）
-    # ────────────────────────────────────────────────────────────────
-
-    return True, f"認証OK（トークン有効期限: {valid_until_str} / {pack_ref}）"
+    return True, f"認証OK（トークン有効期限: {valid_until_str}）"
 
 
 def generate_token(year: int, month: int, random_prefix: str = "") -> str:
