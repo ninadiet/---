@@ -28,8 +28,8 @@ jobs:
           ISSUE_NUM=$(gh api "repos/${{ github.repository }}/issues?labels=daily-operation&state=all&per_page=10" \
             --jq ".[] | select(.title | contains(\"$TODAY\")) | .number" 2>/dev/null | head -1)
           if [ -z "$ISSUE_NUM" ]; then
-            echo "⚠️ Issue for $TODAY not found. daily-cycle may not have run yet."
-            exit 1
+            echo "⚠️ Issue for $TODAY not found yet. Skipping."
+            exit 0
           fi
           # すでに投稿済みかチェック（重複防止）
           ALREADY=$(gh api "repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
@@ -42,8 +42,8 @@ jobs:
           HAS_REVIEW=$(gh api "repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
             --jq ".[] | select(.body | contains(\"承認申請\")) | .id" 2>/dev/null | head -1)
           if [ -z "$HAS_REVIEW" ]; then
-            echo "⚠️ Review not completed yet. daily-cycle may still be running."
-            exit 1
+            echo "⚠️ Review not completed yet. Skipping."
+            exit 0
           fi
           gh issue comment $ISSUE_NUM --repo "${{ github.repository }}" --body "承認"
           echo "✅ Auto-approved Issue #$ISSUE_NUM for $TODAY"
