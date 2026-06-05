@@ -49,18 +49,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TODAY=$(TZ=Asia/Tokyo date +%Y-%m-%d)
-          TITLE=$(gh api "repos/${{ github.repository }}/issues?labels=daily-operation&state=all&per_page=5" \
-            --jq ".[] | select(.title | contains(\"$TODAY\")) | .title" 2>/dev/null || echo "")
-          if [ -n "$TITLE" ]; then
-            echo "should_run=SKIP" >> "$GITHUB_OUTPUT"
-            echo "Today's Issue already exists - skipping."
+          ISSUE_NUM=$(gh api "repos/${{ github.repository }}/issues?labels=daily-operation&state=all&per_page=5" \
+            --jq ".[] | select(.title | contains(\"$TODAY\")) | .number" 2>/dev/null | head -1 || echo "")
+
+          if [ -z "$ISSUE_NUM" ]; then
+            echo "should_run=FULL" >> "$GITHUB_OUTPUT"
+            echo "Today's Issue not found - running full cycle."
           else
-            echo "should_run=RUN" >> "$GITHUB_OUTPUT"
-            echo "No Issue found for today - running cycle."
+            HAS_APPROVAL=$(gh api "repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
+              --jq "[.[] | select(.body | contains(\"承認申請\"))] | length" 2>/dev/null || echo "0")
+            if [ "$HAS_APPROVAL" -gt "0" ]; then
+              echo "should_run=SKIP" >> "$GITHUB_OUTPUT"
+              echo "Pipeline complete (承認申請 found in Issue #$ISSUE_NUM) - skipping."
+            else
+              echo "should_run=LUNA" >> "$GITHUB_OUTPUT"
+              echo "Issue #$ISSUE_NUM exists but no 承認申請 - re-running luna+malfoy."
+            fi
           fi
 
       - name: Step 1-2 - Hermione Research
-        if: steps.skip_check.outputs.should_run != 'SKIP'
+        if: steps.skip_check.outputs.should_run == 'FULL'
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -70,7 +78,7 @@ jobs:
         run: cd scripts && python hermione_research.py --theme "${{ github.event.inputs.theme }}"
 
       - name: Wait for GitHub API to index new Issue
-        if: steps.skip_check.outputs.should_run != 'SKIP'
+        if: steps.skip_check.outputs.should_run == 'FULL'
         run: sleep 60
 
       - name: Step 3-4 - Luna & Malfoy (auto-retry)
