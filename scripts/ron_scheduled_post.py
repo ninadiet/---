@@ -183,6 +183,11 @@ def main():
         logger.info(f"SLOT_{args.slot} のテキストが見つかりません。投稿をスキップします。")
         sys.exit(0)  # exit(0)=正常終了でcronを維持
 
+    # 抽出失敗プレースホルダーが混入していたら投稿しない
+    if "抽出失敗" in post_text:
+        logger.error(f"SLOT_{args.slot} テキストが抽出失敗状態のためスキップします: {post_text[:50]}")
+        sys.exit(0)
+
     logger.info(f"投稿テキスト（先頭50文字）: {post_text[:50]}...")
 
     # ツリー投稿
