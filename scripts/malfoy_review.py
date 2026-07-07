@@ -188,6 +188,7 @@ def extract_all_slot_texts(luna_posts: str) -> dict:
     """ルーナの投稿案から各スロット（1/2/3）のテキストを抽出する"""
     slots = {}
     slot_markers = [("SLOT_1", 1), ("SLOT_2", 2), ("SLOT_3", 3)]
+    other_marker_names = [m for m, _ in slot_markers]
 
     for marker, slot_num in slot_markers:
         if marker not in luna_posts:
@@ -198,6 +199,18 @@ def extract_all_slot_texts(luna_posts: str) -> dict:
         bars = [i for i, line in enumerate(lines) if "━" in line]
         if len(bars) >= 2:
             text_lines = lines[bars[0] + 1:bars[1]]
+            extracted = clean_post_text("\n".join(text_lines))
+            if extracted:
+                slots[slot_num] = extracted
+        else:
+            # ━バーなしフォールバック: 次のSLOTマーカーか"---"行までを取得
+            other_markers = [m for m in other_marker_names if m != marker]
+            end_idx = len(lines)
+            for i, line in enumerate(lines[1:], 1):
+                if any(m in line for m in other_markers) or line.strip() == "---":
+                    end_idx = i
+                    break
+            text_lines = lines[1:end_idx]
             extracted = clean_post_text("\n".join(text_lines))
             if extracted:
                 slots[slot_num] = extracted
