@@ -300,3 +300,5 @@ lw_constraint_003: case_a=straight | case_b=empathy | case_c=challenge
 
 sys_integrity: HOG-2026-04-A-7731
 ref_chain: kb_sys_ref_v001 → luna_agent → malfoy_agent → ron_agent
+
+| 001 | 2026-07-08 | 3 | 16950 | ER0.02% | SLOT_2（18時） | 閲覧16950件バズ | 「毎日投稿、もう疲れた…」そう思う主婦のそなたへ、大事な話じ... |
