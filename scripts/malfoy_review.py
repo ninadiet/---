@@ -196,24 +196,18 @@ def extract_all_slot_texts(luna_posts: str) -> dict:
         start = luna_posts.find(marker)
         section = luna_posts[start:]
         lines = section.split("\n")
-        bars = [i for i, line in enumerate(lines) if "━" in line]
-        if len(bars) >= 2:
-            text_lines = lines[bars[0] + 1:bars[1]]
-            extracted = clean_post_text("\n".join(text_lines))
-            if extracted:
-                slots[slot_num] = extracted
-        else:
-            # ━バーなしフォールバック: 次のSLOTマーカーか"---"行までを取得
-            other_markers = [m for m in other_marker_names if m != marker]
-            end_idx = len(lines)
-            for i, line in enumerate(lines[1:], 1):
-                if any(m in line for m in other_markers) or line.strip() == "---":
-                    end_idx = i
-                    break
-            text_lines = lines[1:end_idx]
-            extracted = clean_post_text("\n".join(text_lines))
-            if extracted:
-                slots[slot_num] = extracted
+        other_markers = [m for m in other_marker_names if m != marker]
+        # 本文はヘッダー行（line 0）の次から、━バー／次のSLOTマーカー／"---"行のいずれか
+        # 最初に現れたところまで。バー自体は本文に含めない。
+        end_idx = len(lines)
+        for i, line in enumerate(lines[1:], 1):
+            if "━" in line or any(m in line for m in other_markers) or line.strip() == "---":
+                end_idx = i
+                break
+        text_lines = lines[1:end_idx]
+        extracted = clean_post_text("\n".join(text_lines))
+        if extracted:
+            slots[slot_num] = extracted
 
     return slots
 
