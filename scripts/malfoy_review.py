@@ -197,14 +197,21 @@ def extract_all_slot_texts(luna_posts: str) -> dict:
         section = luna_posts[start:]
         lines = section.split("\n")
         other_markers = [m for m in other_marker_names if m != marker]
-        # 本文はヘッダー行（line 0）の次から、━バー／次のSLOTマーカー／"---"行のいずれか
-        # 最初に現れたところまで。バー自体は本文に含めない。
+
+        # 本文の開始位置：ヘッダー行（line 0）の次。ただしその行自体が━バーなら
+        # 「ヘッダー→バー→本文」形式とみなし、バーの次から本文とする。
+        # ライターの出力形式（バーの有無・位置）が実行ごとにブレても、
+        # 常に自スロットの本文だけを取り、隣のスロットの内容が混入しないようにする。
+        content_start = 1
+        if content_start < len(lines) and "━" in lines[content_start]:
+            content_start += 1
+
         end_idx = len(lines)
-        for i, line in enumerate(lines[1:], 1):
+        for i, line in enumerate(lines[content_start:], content_start):
             if "━" in line or any(m in line for m in other_markers) or line.strip() == "---":
                 end_idx = i
                 break
-        text_lines = lines[1:end_idx]
+        text_lines = lines[content_start:end_idx]
         extracted = clean_post_text("\n".join(text_lines))
         if extracted:
             slots[slot_num] = extracted
