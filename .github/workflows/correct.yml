@@ -9,6 +9,9 @@ permissions:
   issues: write
   contents: read
 
+env:
+  DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
+
 jobs:
   correct:
     # daily-operationラベルのIssueへのコメントで、「修正:」で始まる場合のみ実行
@@ -32,15 +35,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
-      - name: "🔒 月次トークン認証"
-        env:
-          HOG_MONTHLY_TOKEN: ${{ secrets.HOG_MONTHLY_TOKEN }}
-        run: cd scripts && python auth_gate.py
-
-      - name: Restore auth credentials
-        run: |
-          mkdir -p operation/auth
-          echo "${{ secrets.HOG_ACCESS_KEY }}" | base64 -d > operation/auth/access_HOG-2026-07.key
 
       - name: Re-run Luna (with correction)
         env:

@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
+
 jobs:
   refresh-threads-token:
     runs-on: ubuntu-latest
@@ -35,14 +38,30 @@ jobs:
         run: |
           python scripts/refresh_threads_token.py
 
-      - name: Update GitHub Secret with new token
+      - name: Update GitHub Secret with new token (requires GH_PAT)
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "WARNING: GH_PAT secret 未設定。secret更新スキップ（アーティファクトで受け渡し）"
+            exit 0
+          fi
           NEW_TOKEN=$(cat new_token.txt)
           gh secret set THREADS_ACCESS_TOKEN --body "$NEW_TOKEN"
           echo "GitHub Secret THREADS_ACCESS_TOKEN を更新しました"
-          rm -f new_token.txt
+
+      - name: Upload token as artifact (フォールバック手段)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-threads-token
+          path: new_token.txt
+          retention-days: 1
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: rm -f new_token.txt
 
       - name: Notify Discord on failure
         if: failure()

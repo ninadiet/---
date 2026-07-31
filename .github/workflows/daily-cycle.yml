@@ -16,6 +16,9 @@ permissions:
   issues: write
   contents: read
 
+env:
+  DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
+
 jobs:
   run-daily-cycle:
     runs-on: ubuntu-latest
@@ -33,15 +36,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
-      - name: "🔒 月次トークン認証"
-        env:
-          HOG_MONTHLY_TOKEN: ${{ secrets.HOG_MONTHLY_TOKEN }}
-        run: cd scripts && python auth_gate.py
-
-      - name: Restore auth credentials
-        run: |
-          mkdir -p operation/auth
-          echo "${{ secrets.HOG_ACCESS_KEY }}" | base64 -d > operation/auth/access_HOG-2026-07.key
 
       - name: Check if today already completed
         id: skip_check
@@ -49,26 +43,25 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TODAY=$(TZ=Asia/Tokyo date +%Y-%m-%d)
-          ISSUE_NUM=$(gh api "repos/${{ github.repository }}/issues?labels=daily-operation&state=all&per_page=5" \
+          ISSUE_NUMBER=$(gh api "repos/${{ github.repository }}/issues?labels=daily-operation&state=all&per_page=5" \
             --jq ".[] | select(.title | contains(\"$TODAY\")) | .number" 2>/dev/null | head -1 || echo "")
-
-          if [ -z "$ISSUE_NUM" ]; then
-            echo "should_run=FULL" >> "$GITHUB_OUTPUT"
-            echo "Today's Issue not found - running full cycle."
+          if [ -z "$ISSUE_NUMBER" ]; then
+            echo "should_run=RUN" >> "$GITHUB_OUTPUT"
+            echo "No Issue found for today - running cycle."
           else
-            HAS_APPROVAL=$(gh api "repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
-              --jq "[.[] | select(.body | contains(\"承認申請\"))] | length" 2>/dev/null || echo "0")
-            if [ "$HAS_APPROVAL" -gt "0" ]; then
+            HERMIONE_COMMENT=$(gh api "repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments" \
+              --jq '.[] | select(.body | contains("ハーマイオニーより")) | .body' 2>/dev/null | head -1 || echo "")
+            if [ -n "$HERMIONE_COMMENT" ]; then
               echo "should_run=SKIP" >> "$GITHUB_OUTPUT"
-              echo "Pipeline complete (承認申請 found in Issue #$ISSUE_NUM) - skipping."
+              echo "Hermione already completed today's cycle - skipping."
             else
-              echo "should_run=LUNA" >> "$GITHUB_OUTPUT"
-              echo "Issue #$ISSUE_NUM exists but no 承認申請 - re-running luna+malfoy."
+              echo "should_run=RUN" >> "$GITHUB_OUTPUT"
+              echo "Issue exists but Hermione not done yet - running cycle."
             fi
           fi
 
       - name: Step 1-2 - Hermione Research
-        if: steps.skip_check.outputs.should_run == 'FULL'
+        if: steps.skip_check.outputs.should_run != 'SKIP'
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -76,10 +69,6 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: cd scripts && python hermione_research.py --theme "${{ github.event.inputs.theme }}"
-
-      - name: Wait for GitHub API to index new Issue
-        if: steps.skip_check.outputs.should_run == 'FULL'
-        run: sleep 60
 
       - name: Step 3-4 - Luna & Malfoy (auto-retry)
         if: steps.skip_check.outputs.should_run != 'SKIP'
