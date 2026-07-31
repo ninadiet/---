@@ -65,49 +65,32 @@ jobs:
       - name: Notify Discord - watchdog alert
         if: steps.check_status.outputs.status != 'ok'
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPO: ${{ github.repository }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: |
-          pip install -q requests python-dotenv 2>/dev/null || true
-          STATUS="${{ steps.check_status.outputs.status }}"
-          REPO="${{ github.repository }}"
-
-          python3 - <<'PYEOF'
-import os, requests, datetime
-
-status = os.environ.get("STATUS", "unknown")
-repo = os.environ.get("REPO", "")
-webhook = os.environ.get("DISCORD_WEBHOOK_URL", "")
-
-now_str = datetime.datetime.now().strftime("%H:%M JST")
-cause = "GAS未発火の可能性" if status == "no_issue" else "GASは発火したがハーマイオニー段階まで進んでいない"
-
-message = f"""🔴 **GAS Watchdog 警報** （{now_str} 検知）
-━━━━━━━━━━━━━━━━━━━━━
-## 🚦 今あなたがすること: ⏳ **待つだけ**（追加対応不要）
-━━━━━━━━━━━━━━━━━━━━━
-
-⏰ 次の通知: 5〜10分後に通常の承認依頼通知が届きます
-✅ 8:15 JST 承認デッドライン: 余裕で間に合います
-
-📊 状況サマリ:
-  ・推定原因: {cause}
-  ・自動復旧: daily-cycle.yml を起動済み
-
-━━━━━━━━━━━━━━━━━━━━━
-## 📋 後で確認する場合
-━━━━━━━━━━━━━━━━━━━━━
-トラブルシュート手順書: operation/WATCHDOG_TROUBLESHOOTING.md を参照"""
-
-if webhook:
-    try:
-        requests.post(webhook, json={"content": message}, timeout=10)
-        print("Discord通知送信完了")
-    except Exception as e:
-        print(f"Discord通知失敗: {e}")
-PYEOF
-        env:
           STATUS: ${{ steps.check_status.outputs.status }}
-          REPO: ${{ github.repository }}
+        run: |
+          NOW=$(TZ=Asia/Tokyo date +%H:%M)
+          if [ "$STATUS" = "no_issue" ]; then
+            CAUSE="GAS未発火の可能性"
+          else
+            CAUSE="GASは発火したがハーマイオニー段階まで進んでいない"
+          fi
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL 未設定のため通知スキップ"
+            exit 0
+          fi
+          MSG="🔴 **GAS Watchdog 警報** （${NOW} JST 検知）\n"
+          MSG+="━━━━━━━━━━━━━━━━━━━━━\n"
+          MSG+="## 🚦 今あなたがすること: ⏳ **待つだけ**（追加対応不要）\n"
+          MSG+="━━━━━━━━━━━━━━━━━━━━━\n\n"
+          MSG+="⏰ 次の通知: 5〜10分後に通常の承認依頼通知が届きます\n"
+          MSG+="✅ 8:15 JST 承認デッドライン: 余裕で間に合います\n\n"
+          MSG+="📊 状況サマリ:\n"
+          MSG+="  ・推定原因: ${CAUSE}\n"
+          MSG+="  ・自動復旧: daily-cycle.yml を起動済み\n\n"
+          MSG+="━━━━━━━━━━━━━━━━━━━━━\n"
+          MSG+="## 📋 後で確認する場合\n"
+          MSG+="━━━━━━━━━━━━━━━━━━━━━\n"
+          MSG+="トラブルシュート手順書: operation/WATCHDOG_TROUBLESHOOTING.md を参照"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\":\"$MSG\"}" || echo "Discord通知失敗"
