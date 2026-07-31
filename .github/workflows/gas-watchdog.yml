@@ -36,7 +36,7 @@ jobs:
           else
             echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
             HERMIONE_COMMENT=$(gh api "repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments" \
-              --jq '.[] | select(.body | contains("ハーマイオニーより")) | .body' 2>/dev/null | head -1 || echo "")
+              --jq '.[] | select(.body | contains("趙雲子龍より")) | .body' 2>/dev/null | head -1 || echo "")
 
             if [ -n "$HERMIONE_COMMENT" ]; then
               echo "status=ok" >> "$GITHUB_OUTPUT"
@@ -59,8 +59,7 @@ jobs:
           echo "Triggering daily-cycle recovery..."
           gh api "repos/${{ github.repository }}/actions/workflows/daily-cycle.yml/dispatches" \
             -X POST \
-            -f ref=master \
-            -f inputs='{}' || echo "Failed to trigger daily-cycle"
+            -f ref=master || echo "Failed to trigger daily-cycle"
 
       - name: Notify Discord - watchdog alert
         if: steps.check_status.outputs.status != 'ok'
@@ -72,7 +71,7 @@ jobs:
           if [ "$STATUS" = "no_issue" ]; then
             CAUSE="GAS未発火の可能性"
           else
-            CAUSE="GASは発火したがハーマイオニー段階まで進んでいない"
+            CAUSE="GASは発火したが趙雲子龍段階まで進んでいない"
           fi
           if [ -z "$DISCORD_WEBHOOK_URL" ]; then
             echo "DISCORD_WEBHOOK_URL 未設定のため通知スキップ"

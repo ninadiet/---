@@ -11,6 +11,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AGENT_NAMES_PATH = os.path.join(_PROJECT_ROOT, "operation", "config", "agent_names.json")
 LAST_APPLIED_PATH = os.path.join(_PROJECT_ROOT, "operation", "config", ".last_applied_names.json")
 AGENTS_DIR = os.path.join(_PROJECT_ROOT, ".github", "agents")
+WORKFLOWS_DIR = os.path.join(_PROJECT_ROOT, ".github", "workflows")
 
 # 配布時のデフォルト名（初回実行時の置換元として使用）
 DEFAULT_NAMES = {
@@ -60,7 +61,7 @@ def main():
     agent_files = [
         f for f in glob.glob(os.path.join(AGENTS_DIR, "*.md"))
         if "SYS_CORE_CTRL" not in os.path.basename(f)
-    ]
+    ] + glob.glob(os.path.join(WORKFLOWS_DIR, "*.yml"))
 
     updated = 0
     for filepath in agent_files:
