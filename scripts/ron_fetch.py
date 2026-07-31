@@ -31,8 +31,8 @@ SPREADSHEET_ID          = os.getenv("SPREADSHEET_ID", "")
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/sheets_service_account.json")
 
 THREADS_API_BASE  = "https://graph.threads.net/v1.0"
-BUZZ_THRESHOLD    = 30   # バズ判定のいいね閾値
-BUZZ_VIEWS_THRESHOLD = 3000  # バズ判定の閲覧数閾値
+BUZZ_THRESHOLD    = 3   # バズ判定のいいね閾値（フォロワー数桁の段階では相対的な良投稿を拾うため引き下げ）
+BUZZ_VIEWS_THRESHOLD = 500  # バズ判定の閲覧数閾値（views指標がAPI側で常時0を返す不具合があるため実質使われないが、復旧時のため引き下げ）
 SCRIPT_DIR        = os.path.dirname(os.path.abspath(__file__))
 BUZZ_POSTS_PATH   = os.path.join(SCRIPT_DIR, "..", "operation", "knowledge", "kb_sys_ref_v001.md")
 

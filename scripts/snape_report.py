@@ -76,13 +76,41 @@ def parse_engagement_from_issue(issue) -> dict:
     return data
 
 
+# フォロワー数桁の育成初期段階に合わせて引き下げ（旧: 50件）
+WEEKLY_BUZZ_THRESHOLD = 3
+
+
+def _build_suggestions(post_count: int, likes_list: list, replies_list: list, buzz_count: int, avg_likes: float) -> list:
+    """今週の実データに応じた改善提案を組み立てる（固定テンプレを廃止）"""
+    suggestions = []
+    if post_count == 0:
+        suggestions.append("今週投稿が0件でした。daily-cycle.ymlやscheduled-post系ワークフローが正常に動いているか確認してください。")
+    elif likes_list and all(l == 0 for l in likes_list):
+        suggestions.append(f"今週の投稿{post_count}件すべてでいいねが0件でした。文体の微調整では届かない可能性が高く、フォロワー数の少なさ（リーチの土台）と投稿テーマ・フックの両方を根本から見直す時期です。")
+    elif avg_likes < WEEKLY_BUZZ_THRESHOLD:
+        suggestions.append(f"平均いいね{avg_likes:.1f}件と低調です。{_n('luna')}に文体・冒頭フックの見直しを依頼してください。")
+    elif buzz_count == 0:
+        suggestions.append(f"バズ（いいね{WEEKLY_BUZZ_THRESHOLD}件以上）が今週0件でした。{_n('hermione')}にトレンド分析の精度向上を依頼してください。")
+    else:
+        suggestions.append(f"バズ投稿が{buzz_count}件ありました。良好なパフォーマンスを維持してください。")
+
+    if replies_list and all(r == 0 for r in replies_list):
+        suggestions.append("今週は返信が一切ついていません。読者に問いかける投稿（質問形式・共感を誘う一言）を増やしてみてください。")
+
+    suggestions.append("無料枠の消費状況を来週も引き続き監視する")
+    return suggestions[:3]
+
+
 def generate_snape_report(weekly_issues: list, week_str: str) -> str:
     """スネイプの週次レポートを生成する"""
     post_count   = sum(1 for d in weekly_issues if d["engagement"]["posted"])
     likes_list   = [d["engagement"]["likes"] for d in weekly_issues if d["engagement"]["posted"]]
+    replies_list = [d["engagement"]["replies"] for d in weekly_issues if d["engagement"]["posted"]]
     avg_likes    = sum(likes_list) / len(likes_list) if likes_list else 0
-    buzz_count   = sum(1 for l in likes_list if l >= 50)
+    buzz_count   = sum(1 for l in likes_list if l >= WEEKLY_BUZZ_THRESHOLD)
     max_likes    = max(likes_list) if likes_list else 0
+
+    suggestions_text = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(_build_suggestions(post_count, likes_list, replies_list, buzz_count, avg_likes)))
 
     report = f"""# スネイプ週次監視レポート {week_str}
 
@@ -101,16 +129,14 @@ def generate_snape_report(weekly_issues: list, week_str: str) -> str:
 |---|---|
 | 投稿数 | {post_count} |
 | 平均いいね | {avg_likes:.1f} |
-| バズ投稿数（50+） | {buzz_count} |
+| バズ投稿数（{WEEKLY_BUZZ_THRESHOLD}+） | {buzz_count} |
 | 最高いいね | {max_likes} |
 
 ## ③ 問題発生記録
 （今週のエラー・問題があればここに記録）
 
 ## ④ 改善提案（最大3件）
-{f'1. 平均いいねが低い場合: {_n("luna")}に文体の微調整を依頼する' if avg_likes < 20 else '1. 良好なパフォーマンスを維持中'}
-{f'2. バズ率向上のため: {_n("hermione")}にトレンド分析の精度向上を依頼する' if buzz_count == 0 else ''}
-3. 無料枠の消費状況を来週も引き続き監視する
+{suggestions_text}
 
 ## ⑤ 来週の注意事項
 - 投稿テーマのマンネリ化に注意
@@ -155,7 +181,7 @@ def main():
 
     likes_list = [d["engagement"]["likes"] for d in weekly_issues if d["engagement"]["posted"]]
     avg_likes  = sum(likes_list) / len(likes_list) if likes_list else 0
-    buzz_count = sum(1 for l in likes_list if l >= 50)
+    buzz_count = sum(1 for l in likes_list if l >= WEEKLY_BUZZ_THRESHOLD)
 
     with open(API_USAGE_CSV, "a", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)

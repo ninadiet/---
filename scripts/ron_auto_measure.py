@@ -52,16 +52,18 @@ JST = timezone(timedelta(hours=9))
 SCRIPT_DIR      = os.path.dirname(os.path.abspath(__file__))
 BUZZ_POSTS_PATH = os.path.join(SCRIPT_DIR, "..", "operation", "knowledge", "kb_sys_ref_v001.md")
 
-# ── パフォーマンス判定閾値 ──
-BUZZ_LIKES_THRESHOLD     = 30    # いいね数バズ閾値（伸びている）
-BUZZ_VIEWS_THRESHOLD     = 3000  # 閲覧数バズ閾値（伸びている）
+# ── パフォーマンス判定閾値（フォロワー数桁の育成初期段階に合わせて引き下げ） ──
+# 注: views/インプレッション系はThreads APIの"views"指標が常時0を返す既知の不具合があり
+#     実質いいね(likes)基準でしか判定できない。views系閾値は復旧時のための予防的な値。
+BUZZ_LIKES_THRESHOLD     = 3     # いいね数バズ閾値（伸びている）
+BUZZ_VIEWS_THRESHOLD     = 500   # 閲覧数バズ閾値（伸びている）
 HIGH_ER_THRESHOLD        = 3.0   # ER%「好調」以上
 GREAT_ER_THRESHOLD       = 5.0   # ER%「大バズ」
 LOW_ER_THRESHOLD         = 1.0   # ER%「要改善」
-MIN_VIEWS_FOR_ER_BUZZ    = 500   # ER基準大バズの最低閲覧数
-GOOD_VIEWS_THRESHOLD     = 1000  # 閲覧数「好調」
-LOW_VIEWS_THRESHOLD      = 800   # 閲覧数「要改善」
-FOLLOWER_GROWTH_THRESHOLD = 10   # フォロワー増加「成長日」閾値
+MIN_VIEWS_FOR_ER_BUZZ    = 50    # ER基準大バズの最低閲覧数
+GOOD_VIEWS_THRESHOLD     = 100   # 閲覧数「好調」
+LOW_VIEWS_THRESHOLD      = 50    # 閲覧数「要改善」
+FOLLOWER_GROWTH_THRESHOLD = 1    # フォロワー増加「成長日」閾値
 
 
 def fetch_post_insights(post_id: str, max_retries: int = 2) -> dict:
