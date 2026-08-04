@@ -91,7 +91,7 @@ jobs:
           echo "Triggering daily-cycle recovery..."
           gh api "repos/${{ github.repository }}/actions/workflows/daily-cycle.yml/dispatches" \
             -X POST \
-            -f ref=master \
+            -f ref=${{ github.ref_name }} \
             -f inputs='{}' || echo "Failed to trigger daily-cycle"
 
       - name: Notify Discord - watchdog alert
