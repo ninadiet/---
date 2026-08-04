@@ -38,30 +38,14 @@ jobs:
         run: |
           python scripts/refresh_threads_token.py
 
-      - name: Update GitHub Secret with new token (requires GH_PAT)
+      - name: Update GitHub Secret with new token
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "WARNING: GH_PAT secret 未設定。secret更新スキップ（アーティファクトで受け渡し）"
-            exit 0
-          fi
           NEW_TOKEN=$(cat new_token.txt)
           gh secret set THREADS_ACCESS_TOKEN --body "$NEW_TOKEN"
           echo "GitHub Secret THREADS_ACCESS_TOKEN を更新しました"
-
-      - name: Upload token as artifact (フォールバック手段)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: new-threads-token
-          path: new_token.txt
-          retention-days: 1
-          if-no-files-found: ignore
-
-      - name: Cleanup
-        if: always()
-        run: rm -f new_token.txt
+          rm -f new_token.txt
 
       - name: Notify Discord on failure
         if: failure()
@@ -69,7 +53,8 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             curl -s -X POST "$DISCORD_WEBHOOK_URL" \
               -H "Content-Type: application/json" \
-              -d "{\"content\": \"⚠️ **Threadsトークン自動更新に失敗しました**\\n手動更新が必要です。\\n\\n手順: operation/GAS_SLOT2_SLOT3_SETUP.md の緊急時セクションを参照\"}"
+              -d "{\"content\": \"⚠️ **Threadsトークン自動更新に失敗しました**\\n手動更新が必要です。\\n\\n手順: operation/knowledge/kb_update_202605_maintenance.md の「緊急時：Threadsトークン手動更新手順」\\nログ: $RUN_URL\"}"
           fi

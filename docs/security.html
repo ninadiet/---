@@ -324,14 +324,14 @@
   <div class="section">
     <div class="section-header">
       <div class="section-num">6</div>
-      <div class="section-title">月次認証キー（.keyファイル）の仕組み</div>
+      <div class="section-title">会員認証（Discord在籍確認）の仕組み</div>
     </div>
     <div class="section-body">
-      毎月配布される認証キーファイルは：
+      このシステムの認証は、コミュニティ Discord サーバーへの<strong>在籍確認</strong>で行います（月次の認証キーファイルは廃止済み・毎月の受け取り作業はありません）：
       <ul class="checklist" style="margin-top:14px;">
-        <li>.gitignore により、GitHubには絶対にアップロードされない設定</li>
-        <li>有効期限が切れると自動的にシステムが停止する</li>
-        <li>キーファイルを他人と共有しても、GitHubリポジトリへのアクセス権がなければシステムは動かない</li>
+        <li>実行時に、あなたのDiscordユーザーID（auth_member.txt またはGitHub Secretの DISCORD_USER_ID）で在籍を確認する</li>
+        <li>送信されるのはDiscordユーザーIDのみで、パスワードやAPIキーが外部に送られることはない</li>
+        <li>コミュニティを退会すると在籍確認が通らなくなり、自動的にシステムが停止する</li>
       </ul>
     </div>
   </div>

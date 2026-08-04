@@ -41,10 +41,10 @@ jobs:
           cd scripts
           pip install -r requirements.txt
 
-
       - name: Run Snape Daily Monitor
         env:
           GEMINI_API_KEY:      ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           GITHUB_TOKEN:        ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPO:         ${{ github.repository }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

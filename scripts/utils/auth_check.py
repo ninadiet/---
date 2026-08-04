@@ -21,15 +21,37 @@ _U2_ENDPOINT_DEFAULT = "https://kit-auth.8stn-y1010.workers.dev/"
 _U2_KIT_DEFAULT = "hog"
 
 
+def _read_member_id() -> str:
+    """DiscordユーザーIDを取得する。置き場所・BOM・余計な文字に強くする。
+    優先度：環境変数 DISCORD_USER_ID → auth_member.txt（複数の候補パスを順に探す）。"""
+    uid = os.environ.get("DISCORD_USER_ID", "").strip()
+    if uid:
+        m = re.search(r"\d{15,25}", uid)
+        return m.group(0) if m else ""
+    root = Path(__file__).resolve().parent.parent.parent
+    candidates = [
+        root / "auth_member.txt",
+        Path.cwd() / "auth_member.txt",
+        root / "operation" / "auth_member.txt",
+        root / "operation" / "auth" / "auth_member.txt",
+        root / "scripts" / "auth_member.txt",
+    ]
+    for p in candidates:
+        try:
+            # utf-8-sig でBOMを除去。"ID: 1234..." のような書き方でも数字だけ拾う
+            text = p.read_text(encoding="utf-8-sig")
+        except Exception:
+            continue
+        m = re.search(r"\d{15,25}", text)
+        if m:
+            return m.group(0)
+    return ""
+
+
 def _u2_member_active() -> bool:
     """DISCORD_USER_ID が在籍中か kit-auth Worker に確認。
     未設定・非在籍・通信失敗のいずれも False（→ 旧月次トークン判定にフォールバック）。"""
-    uid = os.environ.get("DISCORD_USER_ID", "").strip()
-    if not uid:  # ローカル(始める)では auth_member.txt から取得
-        try:
-            uid = (Path(__file__).resolve().parent.parent.parent / "auth_member.txt").read_text(encoding="utf-8").strip()
-        except Exception:
-            uid = ""
+    uid = _read_member_id()
     if not uid:
         return False
     endpoint = os.environ.get("LM_AUTH_ENDPOINT", _U2_ENDPOINT_DEFAULT)
@@ -66,10 +88,22 @@ def _verify_checksum(token: str, year: int, month: int) -> bool:
 
 
 def check_auth() -> tuple[bool, str]:
-    """U2(Discord在籍)を優先。activeなら即OK。そうでなければ従来の月次トークン判定（二重判定）。"""
+    """U2(Discord在籍)を優先。activeなら即OK。そうでなければ従来の月次トークン判定（二重判定）。
+    どちらもNGの場合は、廃止済みの月次トークンではなく Discord ID の確認を案内する。"""
     if _u2_member_active():
         return True, "認証OK（Discord在籍 / U2）"
-    return _legacy_check_auth()
+    ok, msg = _legacy_check_auth()
+    if ok:
+        return True, msg
+    return False, (
+        "コミュニティ会員の確認ができませんでした。\n"
+        "次の2つを確認してください：\n"
+        "  1) キット直下の auth_member.txt に、あなたのDiscordユーザーID（数字だけ）が入っているか\n"
+        "     ※ファイルが無ければ作成してください（IDの取得＝Discordで自分のアイコンを右クリック→ユーザーIDをコピー）\n"
+        "  2) コミュニティのDiscordに参加中か\n"
+        "\n"
+        "※月次トークン（.keyファイル）は廃止しました。受け取る必要はありません。"
+    )
 
 
 def _legacy_check_auth() -> tuple[bool, str]:

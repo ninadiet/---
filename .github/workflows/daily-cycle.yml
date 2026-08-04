@@ -36,7 +36,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
-
       - name: Check if today already completed
         id: skip_check
         env:
@@ -50,7 +49,7 @@ jobs:
             echo "No Issue found for today - running cycle."
           else
             HERMIONE_COMMENT=$(gh api "repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments" \
-              --jq '.[] | select(.body | contains("趙雲子龍より")) | .body' 2>/dev/null | head -1 || echo "")
+              --jq '.[] | select(.body | contains("ハーマイオニーより")) | .body' 2>/dev/null | head -1 || echo "")
             if [ -n "$HERMIONE_COMMENT" ]; then
               echo "should_run=SKIP" >> "$GITHUB_OUTPUT"
               echo "Hermione already completed today's cycle - skipping."
@@ -65,6 +64,7 @@ jobs:
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPO: ${{ github.repository }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -74,6 +74,7 @@ jobs:
         if: steps.skip_check.outputs.should_run != 'SKIP'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPO: ${{ github.repository }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -83,7 +84,7 @@ jobs:
           attempt=0
           while [ $attempt -le $MAX_RETRY ]; do
             echo "=== Luna write attempt $((attempt+1))/$((MAX_RETRY+1)) ==="
-            python luna_write.py
+            python luna_write.py --theme "${{ github.event.inputs.theme }}"
             echo "=== Malfoy review attempt $((attempt+1))/$((MAX_RETRY+1)) ==="
             set +e
             python malfoy_review.py

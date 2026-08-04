@@ -20,14 +20,6 @@ from loguru import logger
 
 load_dotenv()
 
-from utils.auth_check import check_auth
-
-_auth_ok, _auth_msg = check_auth()
-if not _auth_ok:
-    import sys as _sys
-    print(f"[認証失敗] {_auth_msg}", file=_sys.stderr)
-    _sys.exit(1)
-
 SPREADSHEET_ID          = os.getenv("SPREADSHEET_ID", "")
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/sheets_service_account.json")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -59,6 +51,11 @@ YOUTUBE_CHANNEL_IDS = _research_cfg.get("youtube_channel_ids", [
     "UCvHpETRVi1tXeRJoYiXHJqw",  # まさおAIじっくり解説ch
     "UCZQVTC3uLCyuJUOcRlguazA",  # にゃんたのAIチャンネル
 ])
+
+# ★ このアカウントのジャンル（research_config.json の topic_genre）
+#   2026-08-01 修正：設定項目として案内していたのに、スクリプトが一度も読んでいなかった。
+#   そのため非AIジャンルに変更しても、ブリーフィングがAI前提のまま出ていた。
+TOPIC_GENRE = str(_research_cfg.get("topic_genre", "")).strip()
 
 # ★ キーワード検索でトレンド動画を拾う設定（research_config.json で変更可能）
 YOUTUBE_KEYWORD_SEARCHES = _research_cfg.get("youtube_keywords", [
@@ -540,11 +537,19 @@ def generate_briefing(videos: list, news: list, buzz_posts: str, theme: str,
 あなたはThreads運用のリサーチ・分析担当「{_n('hermione')}」です。
 以下のデータをもとに、今日の投稿ライター（{_n('luna')}）向けブリーフィングを作成してください。
 
+## 🚩 このアカウントのジャンル（最優先・厳守）
+{TOPIC_GENRE if TOPIC_GENRE else "（未設定：声定義の「発信テーマ・ポジション」に従うこと）"}
+
+**このジャンルから外れたネタは、収集データに含まれていても採用しないこと。**
+固有名詞も、このジャンルに実在するものだけを挙げること（実在しないものを創作しない）。
+
 ## 今日のテーマ方針
 {theme if theme else "（指定なし：自動選定してください）"}
 
+**テーマ方針に「◯◯は書かない」等の禁止が書かれていたら、他のどの指示よりも優先して従うこと。**
+
 ## 収集したYouTube最新動画（監視チャンネル＋キーワード検索）
-※ keyword フィールドがある動画はキーワード検索「AIエージェント/Claude Code」でヒットした最新情報です
+※ keyword フィールドがある動画は、research_config.json のキーワード検索でヒットした最新情報です
 {json.dumps(videos, ensure_ascii=False, indent=2)}
 
 ## 収集したAIニュース
@@ -558,15 +563,55 @@ def generate_briefing(videos: list, news: list, buzz_posts: str, theme: str,
 {buzz_posts[:2000]}
 
 ---
-以下のフォーマットでブリーフィングを出力してください：
+## 採用禁止のネタ
+以下のネタは絶対に選ばないこと：
+- 一般読者が知らない専門的な型番・規格・スペックの比較
+- 抽象的な「業界の将来」「動向」論
+- 「〇〇とは何か」の解説系（具体的な使い方・体験談でないもの）
+- 声定義の「発信テーマ・ポジション」から外れたジャンルのネタ
+
+---
+以下のフォーマットでブリーフィングを出力してください。全スロットで全項目を必ず埋めること：
 
 【本日のブリーフィング】
+
+### SLOT_1（7時・朝投稿）
 推奨ネタ: [ネタの要約（1〜2文）]
+**ネタ軸**: [時間軸 / コスト軸 / 不安解消軸 のいずれか1つを必ず選択]
+**フックに使う固有名詞**: [このアカウントのジャンルに実在する商品名・道具名・サービス名・成分名・書名を必ず1つ以上。実在しないものを創作しない]
+**フックに使う具体的数字**: [金額・倍数・期間・日数等を必ず1つ以上]
+**読者の生活インパクト**: [この投稿で読者の生活がどう変わるか1文]
 角度: [どういう切り口で書くか]
 感情フック: [好奇心/共感/驚き/危機感のどれか]
 参考バズ投稿: [類似の過去投稿No.（あれば）]
 NGワード/注意点: [あれば]
 リサーチ元: [YouTube動画タイトル or ニュース記事タイトル]
+
+### SLOT_2（18時・夕方投稿）
+推奨ネタ: [ネタの要約（1〜2文）]
+**ネタ軸**: [時間軸 / コスト軸 / 不安解消軸 のいずれか1つを必ず選択]
+**フックに使う固有名詞**: [このアカウントのジャンルに実在する商品名・道具名・サービス名・成分名・書名を必ず1つ以上。実在しないものを創作しない]
+**フックに使う具体的数字**: [金額・倍数・期間・日数等を必ず1つ以上]
+**読者の生活インパクト**: [この投稿で読者の生活がどう変わるか1文]
+角度: [どういう切り口で書くか]
+感情フック: [好奇心/共感/驚き/危機感のどれか]
+参考バズ投稿: [類似の過去投稿No.（あれば）]
+NGワード/注意点: [あれば]
+リサーチ元: [YouTube動画タイトル or ニュース記事タイトル]
+
+### SLOT_3（21時・夜投稿）
+推奨ネタ: [ネタの要約（1〜2文）]
+**ネタ軸**: [時間軸 / コスト軸 / 不安解消軸 のいずれか1つを必ず選択]
+**フックに使う固有名詞**: [このアカウントのジャンルに実在する商品名・道具名・サービス名・成分名・書名を必ず1つ以上。実在しないものを創作しない]
+**フックに使う具体的数字**: [金額・倍数・期間・日数等を必ず1つ以上]
+**読者の生活インパクト**: [この投稿で読者の生活がどう変わるか1文]
+角度: [どういう切り口で書くか]
+感情フック: [好奇心/共感/驚き/危機感のどれか]
+参考バズ投稿: [類似の過去投稿No.（あれば）]
+NGワード/注意点: [あれば]
+リサーチ元: [YouTube動画タイトル or ニュース記事タイトル]
+
+★全スロットで「ネタ軸」「固有名詞」「具体的数字」「読者の生活インパクト」が埋まっていること★
 """
 
     return call_gemini(prompt, GEMINI_API_KEY)

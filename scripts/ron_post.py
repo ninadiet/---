@@ -23,14 +23,6 @@ from loguru import logger
 
 load_dotenv()
 
-from utils.auth_check import check_auth
-
-_auth_ok, _auth_msg = check_auth()
-if not _auth_ok:
-    import sys as _sys
-    print(f"[認証失敗] {_auth_msg}", file=_sys.stderr)
-    _sys.exit(1)
-
 THREADS_ACCESS_TOKEN    = os.getenv("THREADS_ACCESS_TOKEN")
 THREADS_USER_ID         = os.getenv("THREADS_USER_ID")
 GITHUB_TOKEN            = os.getenv("GITHUB_TOKEN")
@@ -176,30 +168,23 @@ def main():
     parser.add_argument("--publish-container", default="",
                         help="指定したコンテナIDを公開する（--draftで作成済みの場合）")
     parser.add_argument("--check-approval", action="store_true", help="承認確認モード（後方互換）")
-    parser.add_argument("--issue-number", type=int, default=0,
-                        help="操作対象のIssue番号（approve-and-postワークフローから渡される）")
     args = parser.parse_args()
 
     logger.info("=== ロン 投稿実行開始 ===")
 
-    # 月次認証チェック（GitHub Actions環境ではスキップ）
-    if os.environ.get("GITHUB_ACTIONS") != "true":
-        try:
-            from utils.auth_check import check_auth
-        except ImportError:
-            from auth_check import check_auth
-        is_valid, auth_msg = check_auth()
-        if not is_valid:
-            logger.error(f"認証エラー: {auth_msg}")
-            sys.exit(1)
-        logger.info(auth_msg)
+    # 月次認証チェック
+    try:
+        from utils.auth_check import check_auth
+    except ImportError:
+        from auth_check import check_auth
+    is_valid, auth_msg = check_auth()
+    if not is_valid:
+        logger.error(f"認証エラー: {auth_msg}")
+        sys.exit(1)
+    logger.info(auth_msg)
 
-    gh = GitHubIssues(GITHUB_TOKEN, GITHUB_REPO)
-    if args.issue_number:
-        issue = gh.repo.get_issue(args.issue_number)
-        logger.info(f"指定Issue #{args.issue_number} を使用")
-    else:
-        issue = gh.get_or_create_today_issue()
+    gh    = GitHubIssues(GITHUB_TOKEN, GITHUB_REPO)
+    issue = gh.get_or_create_today_issue()
     gh.update_pipeline_status(issue.number, "ron_post", "running")
 
     # ── 既存コンテナを公開するモード ──────────────────

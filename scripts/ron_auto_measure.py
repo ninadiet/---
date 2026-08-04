@@ -31,14 +31,6 @@ from loguru import logger
 
 load_dotenv()
 
-from utils.auth_check import check_auth
-
-_auth_ok, _auth_msg = check_auth()
-if not _auth_ok:
-    import sys as _sys
-    print(f"[認証失敗] {_auth_msg}", file=_sys.stderr)
-    _sys.exit(1)
-
 THREADS_ACCESS_TOKEN    = os.getenv("THREADS_ACCESS_TOKEN")
 THREADS_USER_ID         = os.getenv("THREADS_USER_ID")
 GITHUB_TOKEN            = os.getenv("GITHUB_TOKEN")
@@ -52,18 +44,21 @@ JST = timezone(timedelta(hours=9))
 SCRIPT_DIR      = os.path.dirname(os.path.abspath(__file__))
 BUZZ_POSTS_PATH = os.path.join(SCRIPT_DIR, "..", "operation", "knowledge", "kb_sys_ref_v001.md")
 
-# ── パフォーマンス判定閾値（フォロワー数桁の育成初期段階に合わせて引き下げ） ──
-# 注: views/インプレッション系はThreads APIの"views"指標が常時0を返す既知の不具合があり
-#     実質いいね(likes)基準でしか判定できない。views系閾値は復旧時のための予防的な値。
-BUZZ_LIKES_THRESHOLD     = 3     # いいね数バズ閾値（伸びている）
-BUZZ_VIEWS_THRESHOLD     = 500   # 閲覧数バズ閾値（伸びている）
+# ── パフォーマンス判定閾値 ──
+BUZZ_LIKES_THRESHOLD     = 30    # いいね数バズ閾値（伸びている）
+BUZZ_VIEWS_THRESHOLD     = 3000  # 閲覧数バズ閾値（伸びている）
 HIGH_ER_THRESHOLD        = 3.0   # ER%「好調」以上
 GREAT_ER_THRESHOLD       = 5.0   # ER%「大バズ」
 LOW_ER_THRESHOLD         = 1.0   # ER%「要改善」
-MIN_VIEWS_FOR_ER_BUZZ    = 50    # ER基準大バズの最低閲覧数
-GOOD_VIEWS_THRESHOLD     = 100   # 閲覧数「好調」
-LOW_VIEWS_THRESHOLD      = 50    # 閲覧数「要改善」
-FOLLOWER_GROWTH_THRESHOLD = 1    # フォロワー増加「成長日」閾値
+MIN_VIEWS_FOR_ER_BUZZ    = 500   # ER基準大バズの最低閲覧数
+GOOD_VIEWS_THRESHOLD     = 1000  # 閲覧数「好調」
+LOW_VIEWS_THRESHOLD      = 800   # 閲覧数「要改善」
+FOLLOWER_GROWTH_THRESHOLD = 10   # フォロワー増加「成長日」閾値
+
+# ── バズ知識保管の新基準（ER×閲覧の両方を満たす必要あり） ──
+BUZZ_ER_THRESHOLD   = 2.0   # バズ保管に必要な最低ER%
+BUZZ_VIEWS_FOR_ER   = 1000  # バズ保管に必要な最低閲覧数
+LOW_ER_POSTS_PATH   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "operation", "knowledge", "low_er_posts.md")
 
 
 def fetch_post_insights(post_id: str, max_retries: int = 2) -> dict:
@@ -195,6 +190,102 @@ def fetch_follower_count() -> int | None:
         return None
 
 
+def fetch_threads_follower_count() -> int | None:
+    """Threads Graph APIからフォロワー数を取得する（/me/threads_insights 対応版）"""
+    if not THREADS_ACCESS_TOKEN or not THREADS_USER_ID:
+        return None
+    # まずユーザーフィールドから直接取得を試みる
+    try:
+        resp = requests.get(
+            f"{THREADS_API_BASE}/{THREADS_USER_ID}",
+            params={"fields": "followers_count", "access_token": THREADS_ACCESS_TOKEN},
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            val = resp.json().get("followers_count")
+            if val is not None:
+                return int(val)
+    except Exception:
+        pass
+    # フォールバック: threads_insights から取得
+    try:
+        resp = requests.get(
+            f"{THREADS_API_BASE}/{THREADS_USER_ID}/threads_insights",
+            params={
+                "metric": "followers_count",
+                "period": "lifetime",
+                "access_token": THREADS_ACCESS_TOKEN,
+            },
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            for item in resp.json().get("data", []):
+                if item.get("name") == "followers_count":
+                    values = item.get("values", [])
+                    if values:
+                        return int(values[-1].get("value", 0))
+    except Exception:
+        pass
+    return None
+
+
+def ensure_follower_sheet_and_record_today(follower_count: int | None) -> None:
+    """
+    フォロワー推移シートに本日のフォロワー数を記録する。
+    シートが存在しなければ自動作成。既に今日の記録があれば重複追加しない。
+    シート構造: A:日付 / B:曜日 / C:計測時刻 / D:フォロワー数 / E:前日比
+    """
+    if follower_count is None or not SPREADSHEET_ID or not GOOGLE_CREDENTIALS_PATH:
+        return
+    try:
+        from utils.sheets_logger import _get_client, _PROJECT_ROOT
+        creds_path = GOOGLE_CREDENTIALS_PATH
+        if not os.path.isabs(creds_path):
+            creds_path = os.path.join(_PROJECT_ROOT, creds_path)
+        if not os.path.exists(creds_path):
+            return
+
+        client = _get_client(creds_path)
+        spreadsheet = client.open_by_key(SPREADSHEET_ID)
+
+        # シートが存在しなければ作成
+        try:
+            sheet = spreadsheet.worksheet("フォロワー推移")
+        except Exception:
+            sheet = spreadsheet.add_worksheet(title="フォロワー推移", rows=500, cols=5)
+            sheet.append_row(["日付", "曜日", "計測時刻", "フォロワー数", "前日比"])
+
+        now_jst = datetime.now(JST)
+        today_str = now_jst.strftime("%Y-%m-%d")
+        weekday_names = ["月", "火", "水", "木", "金", "土", "日"]
+        weekday = weekday_names[now_jst.weekday()]
+        time_str = now_jst.strftime("%H:%M")
+
+        # 今日の記録が既にある場合は重複追加しない
+        all_values = sheet.get_all_values()
+        for row in all_values[1:]:
+            if row and row[0] == today_str:
+                logger.info(f"フォロワー推移: {today_str} は既に記録済み（スキップ）")
+                return
+
+        # 前日比を計算
+        prev_count = None
+        if len(all_values) >= 2:
+            try:
+                prev_count = int(all_values[-1][3])
+            except (ValueError, IndexError):
+                pass
+        diff_str = ""
+        if prev_count is not None:
+            diff = follower_count - prev_count
+            diff_str = f"+{diff}" if diff >= 0 else str(diff)
+
+        sheet.append_row([today_str, weekday, time_str, follower_count, diff_str])
+        logger.info(f"フォロワー推移記録: {today_str} {follower_count}人 ({diff_str})")
+    except Exception as e:
+        logger.warning(f"フォロワー推移シート更新失敗: {e}")
+
+
 def get_yesterday_follower_count() -> int | None:
     """Google Sheetsのフォロワー推移シートから前日のフォロワー数を取得する"""
     if not SPREADSHEET_ID or not GOOGLE_CREDENTIALS_PATH:
@@ -243,21 +334,64 @@ def judge_performance(likes: int, views: int, er: float) -> tuple[str, str]:
     return "📝 普通", f"ER{er}%"
 
 
-def should_save_as_knowledge(likes: int, views: int, er: float, is_follower_growth_day: bool) -> tuple[bool, str]:
+def should_save_as_knowledge(likes: int, views: int, er: float, is_follower_growth_day: bool) -> tuple[bool, str, str]:
     """
-    ナレッジ（kb_sys_ref_v001.md）に保管すべきかを判定する。
-    Returns: (should_save, reason)
+    ナレッジ保管先を判定する。
+    Returns: (should_save, target, reason)
+      target = "buzz" | "low_er" | ""
     """
-    reasons = []
-    if likes >= BUZZ_LIKES_THRESHOLD:
-        reasons.append(f"いいね{likes}件バズ")
-    if views >= BUZZ_VIEWS_THRESHOLD:
-        reasons.append(f"閲覧{views}件バズ")
+    # バズ保管: ER≥2% AND 閲覧≥1000 を両方満たす場合のみ
+    if er >= BUZZ_ER_THRESHOLD and views >= BUZZ_VIEWS_FOR_ER:
+        reason = f"ER{er}%×閲覧{views}バズ"
+        if is_follower_growth_day:
+            reason += " / フォロワー成長日"
+        return True, "buzz", reason
     if is_follower_growth_day:
-        reasons.append("フォロワー成長日")
-    if reasons:
-        return True, " / ".join(reasons)
-    return False, ""
+        return True, "buzz", "フォロワー成長日"
+    # いいね・閲覧の旧基準は buzz 保管の対象外（low_er判定のみ）
+    if likes >= BUZZ_LIKES_THRESHOLD:
+        return True, "buzz", f"いいね{likes}件バズ"
+    if views >= BUZZ_VIEWS_THRESHOLD:
+        return True, "buzz", f"閲覧{views}件バズ"
+    # 閲覧≥1000だがER<2%の投稿は反省サンプルとしてlow_erに記録
+    if views >= BUZZ_VIEWS_FOR_ER and er < BUZZ_ER_THRESHOLD:
+        return True, "low_er", f"閲覧{views}件（ER{er}%で基準未達）"
+    return False, "", ""
+
+
+def save_low_er_record(post_text: str, likes: int, views: int, er: float,
+                       date_str: str, slot_label: str, reason: str):
+    """高閲覧・低ERの投稿をlow_er_posts.mdに反省サンプルとして追記する"""
+    try:
+        try:
+            with open(LOW_ER_POSTS_PATH, "r", encoding="utf-8") as f:
+                content = f.read()
+        except FileNotFoundError:
+            content = "# low_er_posts.md\n閲覧数は伸びたがERが低かった投稿の反省サンプル\n\n| No. | 日付 | いいね | 閲覧数 | ER | スロット | 備考 | 冒頭 |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n"
+
+        existing = content.count("| L")
+        new_no = f"L{existing + 1:03d}"
+        new_row = (
+            f"| {new_no} | {date_str} | {likes} | {views} | "
+            f"ER{er}% | {slot_label} | {reason} | {post_text[:30]}... |"
+        )
+
+        if "| --- |" in content:
+            lines = content.split("\n")
+            for i, line in enumerate(lines):
+                if line.startswith("| --- |"):
+                    lines.insert(i + existing + 1, new_row)
+                    break
+            updated_content = "\n".join(lines)
+        else:
+            updated_content = content + f"\n{new_row}"
+
+        with open(LOW_ER_POSTS_PATH, "w", encoding="utf-8") as f:
+            f.write(updated_content)
+
+        logger.info(f"低ER記録保管: {slot_label} ({reason}) → low_er_posts.md")
+    except Exception as e:
+        logger.warning(f"low_er_posts.md 書き込み失敗: {e}")
 
 
 def find_target_issue(gh: GitHubIssues, target_date: str):
@@ -361,6 +495,10 @@ def main():
     logger.info(f"=== ロン 自動計測開始 (対象日: {target_date}) ===")
 
     gh = GitHubIssues(GITHUB_TOKEN, GITHUB_REPO)
+
+    # フォロワー推移を最初に記録
+    current_followers_today = fetch_threads_follower_count()
+    ensure_follower_sheet_and_record_today(current_followers_today)
 
     # 対象日のIssueを検索
     issue = find_target_issue(gh, target_date)
@@ -484,12 +622,15 @@ def main():
         perf_label, perf_reason = judge_performance(likes, views, er)
 
         # ナレッジ保管判定
-        should_save, save_reason = should_save_as_knowledge(
+        should_save, save_target, save_reason = should_save_as_knowledge(
             likes, views, er, is_follower_growth_day
         )
         if should_save and post_text:
-            save_knowledge(post_text, likes, views, er, target_date, label, save_reason, follower_diff)
-            knowledge_saved.append((label, save_reason))
+            if save_target == "buzz":
+                save_knowledge(post_text, likes, views, er, target_date, label, save_reason, follower_diff)
+                knowledge_saved.append((label, save_reason))
+            elif save_target == "low_er":
+                save_low_er_record(post_text, likes, views, er, target_date, label, save_reason)
 
         report_lines.append(f"### {label} {perf_label}")
         report_lines.append(f"| 指標 | 数値 |")

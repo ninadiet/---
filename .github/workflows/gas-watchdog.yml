@@ -1,5 +1,14 @@
 name: GAS Watchdog - Daily Cycle Monitor
 
+# 目的: 外部スケジューラ(GAS)が 05:00 JST に daily-cycle を起動できなかった場合に
+#       06:30 JST で検知し、(1) daily-cycle を自動起動 (2) Discord に通知 する番犬。
+#
+# ⚠️ 通知の本文は .github/workflows の中に Python を直書きしないこと。
+#    `run: |` の中にヒアドキュメントで Python を貼ると、Python 側がインデント0で
+#    書かれた瞬間に YAML のブロックスカラーがそこで終わってしまい、
+#    ワークフロー全体が "Invalid workflow file" になる（＝1行も動かない）。
+#    通知の中身は scripts/utils/notify_watchdog.py に置いてある。そちらを直すこと。
+
 on:
   schedule:
     - cron: '30 21 * * *'  # 06:30 JST（GAS 05:00 発火後の確認）
@@ -19,6 +28,14 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Check today's cycle status
         id: check_status
         env:
@@ -36,7 +53,7 @@ jobs:
           else
             echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
             HERMIONE_COMMENT=$(gh api "repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments" \
-              --jq '.[] | select(.body | contains("趙雲子龍より")) | .body' 2>/dev/null | head -1 || echo "")
+              --jq '.[] | select(.body | contains("ハーマイオニーより")) | .body' 2>/dev/null | head -1 || echo "")
 
             if [ -n "$HERMIONE_COMMENT" ]; then
               echo "status=ok" >> "$GITHUB_OUTPUT"
@@ -51,45 +68,44 @@ jobs:
         if: steps.check_status.outputs.status == 'ok'
         run: echo "All good - Hermione completed today's cycle"
 
+      # 時間帯ガード: 自動復旧は朝（JST 06:00-09:00）だけに限定する。
+      # 深夜・日中に手動テストや再実行でこのワークフローが動いても、
+      # daily-cycle を勝手に起動しない（意図しない投稿を防ぐ）。通知は時間帯に関係なく送る。
+      - name: Time window guard (JST 06:00-09:00 のみ自動復旧)
+        id: timeguard
+        run: |
+          JST_HOUR=$(TZ=Asia/Tokyo date +%H)
+          if [ "$JST_HOUR" -ge 6 ] && [ "$JST_HOUR" -le 9 ]; then
+            echo "auto_recover=true" >> "$GITHUB_OUTPUT"
+            echo "Watchdog: 朝の時間帯（${JST_HOUR}時）→ 自動復旧モード"
+          else
+            echo "auto_recover=false" >> "$GITHUB_OUTPUT"
+            echo "Watchdog: 朝以外（${JST_HOUR}時）→ 通知のみ・自動復旧は行わない"
+          fi
+
       - name: Auto-recover - trigger daily-cycle
-        if: steps.check_status.outputs.status != 'ok'
+        if: steps.check_status.outputs.status != 'ok' && steps.timeguard.outputs.auto_recover == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Triggering daily-cycle recovery..."
           gh api "repos/${{ github.repository }}/actions/workflows/daily-cycle.yml/dispatches" \
             -X POST \
-            -f ref=master || echo "Failed to trigger daily-cycle"
+            -f ref=master \
+            -f inputs='{}' || echo "Failed to trigger daily-cycle"
 
       - name: Notify Discord - watchdog alert
         if: steps.check_status.outputs.status != 'ok'
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          STATUS: ${{ steps.check_status.outputs.status }}
+          # notify_watchdog.py はこの名前で状態を読む（status= の値をそのまま渡す）
+          WATCHDOG_STATUS: ${{ steps.check_status.outputs.status }}
         run: |
-          NOW=$(TZ=Asia/Tokyo date +%H:%M)
-          if [ "$STATUS" = "no_issue" ]; then
-            CAUSE="GAS未発火の可能性"
-          else
-            CAUSE="GASは発火したが趙雲子龍段階まで進んでいない"
-          fi
-          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
-            echo "DISCORD_WEBHOOK_URL 未設定のため通知スキップ"
-            exit 0
-          fi
-          MSG="🔴 **GAS Watchdog 警報** （${NOW} JST 検知）\n"
-          MSG+="━━━━━━━━━━━━━━━━━━━━━\n"
-          MSG+="## 🚦 今あなたがすること: ⏳ **待つだけ**（追加対応不要）\n"
-          MSG+="━━━━━━━━━━━━━━━━━━━━━\n\n"
-          MSG+="⏰ 次の通知: 5〜10分後に通常の承認依頼通知が届きます\n"
-          MSG+="✅ 8:15 JST 承認デッドライン: 余裕で間に合います\n\n"
-          MSG+="📊 状況サマリ:\n"
-          MSG+="  ・推定原因: ${CAUSE}\n"
-          MSG+="  ・自動復旧: daily-cycle.yml を起動済み\n\n"
-          MSG+="━━━━━━━━━━━━━━━━━━━━━\n"
-          MSG+="## 📋 後で確認する場合\n"
-          MSG+="━━━━━━━━━━━━━━━━━━━━━\n"
-          MSG+="トラブルシュート手順書: operation/WATCHDOG_TROUBLESHOOTING.md を参照"
-          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "{\"content\":\"$MSG\"}" || echo "Discord通知失敗"
+          pip install -q requests
+          python scripts/utils/notify_watchdog.py
+
+      - name: Manual test info (off-hours)
+        if: steps.check_status.outputs.status != 'ok' && steps.timeguard.outputs.auto_recover == 'false'
+        run: |
+          echo "::notice::朝以外の時間帯のため、自動復旧はスキップしました（深夜・日中の意図しない投稿を防止）"
+          echo "もし意図的に daily-cycle を起動したい場合は、Actions ページから daily-cycle を手動で起動してください"

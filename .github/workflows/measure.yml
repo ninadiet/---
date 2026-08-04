@@ -36,7 +36,6 @@ jobs:
           cd scripts
           pip install -r requirements.txt
 
-
       - name: Step 6 - Ron Fetches Engagement Data
         env:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}

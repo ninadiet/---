@@ -17,14 +17,6 @@ from loguru import logger
 
 load_dotenv()
 
-from utils.auth_check import check_auth
-
-_auth_ok, _auth_msg = check_auth()
-if not _auth_ok:
-    import sys as _sys
-    print(f"[認証失敗] {_auth_msg}", file=_sys.stderr)
-    _sys.exit(1)
-
 GEMINI_API_KEY      = os.getenv("GEMINI_API_KEY")
 GITHUB_TOKEN        = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO         = os.getenv("GITHUB_REPO")
@@ -101,7 +93,49 @@ def load_reference_posts() -> str:
         return "（参考投稿なし）"
 
 
-def generate_posts(briefing: str, voice_def: str, ref_posts: str, malfoy_feedback: str = "") -> str:
+def _cli_theme() -> str:
+    """--theme "..." を拾う（argparse を足すと既存の呼び出し方を壊すため最小実装）。"""
+    argv = sys.argv[1:]
+    for i, a in enumerate(argv):
+        if a == "--theme" and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith("--theme="):
+            return a.split("=", 1)[1]
+    return ""
+
+
+def load_theme_directives(cli_theme: str = "") -> str:
+    """本日のテーマ指定を集める（2026-08-01 追加）。
+
+    それまでテーマは hermione_research.py にしか渡っておらず、
+    ルーナ（執筆）には一切届いていなかった。そのため theme に
+    「◯◯は書かない」と明記しても本文に混入し続けた。
+    ここで2経路を拾う：
+      1. ワークフローから渡される --theme（workflow_dispatch の入力）
+      2. operation/themes/ の最新ファイル（番号が大きいものを最新とみなす）
+    """
+    parts = []
+    t = (cli_theme or "").strip()
+    if t and t.lower() not in ("none", "null"):
+        parts.append(f"【本日のテーマ指定】\n{t}")
+
+    themes_dir = os.path.join(SCRIPT_DIR, "..", "operation", "themes")
+    try:
+        files = sorted(f for f in os.listdir(themes_dir) if f.endswith(".md"))
+        if files:
+            path = os.path.join(themes_dir, files[-1])
+            with open(path, "r", encoding="utf-8") as f:
+                body = f.read().strip()
+            if body:
+                parts.append(f"【テーマファイル {files[-1]}】\n{body}")
+    except Exception as e:
+        logger.warning(f"テーマファイルの読み込みをスキップ: {e}")
+
+    return "\n\n".join(parts)
+
+
+def generate_posts(briefing: str, voice_def: str, ref_posts: str, malfoy_feedback: str = "",
+                   theme_directives: str = "") -> str:
     """Gemini Flash で投稿案3案を生成する（タイムアウト・フォールバック付き）"""
 
     persona_name = extract_persona_name(voice_def)
@@ -124,34 +158,6 @@ def generate_posts(briefing: str, voice_def: str, ref_posts: str, malfoy_feedbac
 - 「皆さん」は使用禁止。「みんな」を使うこと
 - 「〜してください」「〜しませんか」等の丁寧語は使用禁止
 - *（アスタリスク）は使用禁止。強調は「」を使うこと
-
-■ 【最重要】必勝8ステップ構造（実証パターン）
-詳細は operation/knowledge/_universal_post_playbook.md 参照
-
-3スロット教育型は以下の構造を厳守：
-
-【1/3 メイン】
-- Step 1. 引用フック『○○』（読者の心の声）
-- Step 2. 数字権威「○年、○○人見てきて」
-- Step 3. 結果先出し「○○が1つだけあった」
-
-【2/3 リプ1】
-- Step 4. 答えは1つだけ『○○』
-- Step 5. 理由＋なぜ効くか（短く）
-- Step 6. 逆ケース対比「逆に○○な人は」
-
-【3/3 リプ2】
-- Step 7. 自分の実践（家・現場・自分の体験）
-- Step 8. 低コストCTA「今日1回だけ試してみて✨」
-
-■ 数字権威の使い分け
-- 個別経験（深い）→ 「○○年、○○人を担当してきて」
-- 広域観察（広い）→ 「○○年、○○人見てきて」
-- 現場頻度（日常）→ 「毎日○○人にやってる現場で」
-
-■ CTA設計
-CTA は operation/knowledge/_purpose_cta_guide.md の6パターンを使い分け。
-アカウントの目的（サービス集客/コミュニティ/イベント等）に応じたパターンを選択。
 """
 
     feedback_section = f"""
@@ -159,7 +165,21 @@ CTA は operation/knowledge/_purpose_cta_guide.md の6パターンを使い分�
 {malfoy_feedback}
 """ if malfoy_feedback else ""
 
-    prompt = f"""
+    theme_block = ""
+    if theme_directives:
+        theme_block = f"""
+## 🚩 本日のテーマ指定（他のどの指示よりも優先・絶対厳守）
+
+{theme_directives}
+
+**ここに「◯◯は書かない」「◯◯禁止」と書かれていたら、例外なく従うこと。**
+このファイル内の他の例示や慣習より、この指定が優先される。
+指定に反する題材・固有名詞は、たとえ例として挙がっていても一切使わない。
+
+---
+"""
+
+    prompt = f"""{theme_block}
 ## 発信テーマ（必須・厳守）
 声定義の「発信テーマ・ポジション」に書かれたテーマが軸。
 - 声定義のテーマに沿った**自分の実体験・気づき・ノウハウ**として語ること
@@ -239,6 +259,37 @@ CTA は operation/knowledge/_purpose_cta_guide.md の6パターンを使い分�
 - * （アスタリスク）は絶対に使用禁止。1つでも含まれていたら即差し戻し
 - 強調したい場合は「」（カギ括弧）を使うこと
 
+## ★フック必須3要素★
+| 必須要素 | 何を入れるか | NG例 |
+|---|---|---|
+| 固有名詞 | **自分のジャンルに実在する**商品名・道具名・サービス名・成分名・書名 | あるもの/人気のアレ/最新の◯◯ |
+| 具体的数字 | 金額・期間・回数・量（2万円/3年/60日/1日10分） | すごく/劇的に/だいぶ |
+| 読者の生活インパクト | その人の1日が具体的にどう変わるか | 便利/効率的/クール |
+
+⚠️ 固有名詞は**声定義の「発信テーマ・ポジション」のジャンルに実在するもの**を書くこと。
+- 自分のジャンルと関係ない分野の固有名詞を持ち込まない
+- **存在しない商品名・サービス名を創作しない**（実在するものだけを書く。思いつかなければ数字と生活インパクトで具体性を出す）
+
+## ⛔ 絶対禁止フック
+- 「プロ級の」「神レベルの」（程度が曖昧）
+- 「ある質問」「ある方法」（具体性なし）
+- 「最新の」（単独使用禁止・固有名詞と組み合わせるならOK）
+- 「〇〇な人」（ターゲット曖昧）
+- 一般読者が知らない専門的な型番・規格・スペックの比較（マニア向けになり伸びない）
+
+## 💰 「稼げる」系の遠回し表現（規約配慮）
+❌ 直接: 「これで月10万稼げる」「副業で稼げる」「収入が3倍に」
+✅ 遠回し:
+- 「給料以外の柱が立つ」「収入の選択肢が増える」
+- 「会社に依存しない働き方ができる」
+- 「やりたい仕事だけ選べるように」
+- 「経済的余白が生まれる」
+
+## 🎯 ネタ軸は3つだけに絞る
+1. 時間軸（効率化・自動化・時短）
+2. コスト軸（無料代替・節約）
+3. 不安解消軸（取り残される恐怖・知らないと損）
+
 ## 時間帯別トーン
 🌅 SLOT_1【7時】情報系・発見系。「今日から使える知識」
 🌆 SLOT_2【18時】共感系。仕事終わりに「わかるー」「大事だな」
@@ -316,14 +367,31 @@ CTA は operation/knowledge/_purpose_cta_guide.md の6パターンを使い分�
     return result
 
 
+def _replace_quotes_alternating(text: str, char: str, open_q: str, close_q: str) -> str:
+    """半角クォートを開閉交互置換する（1個目→開き括弧、2個目→閉じ括弧、...）"""
+    parts = text.split(char)
+    result = parts[0]
+    for i, part in enumerate(parts[1:]):
+        result += open_q if i % 2 == 0 else close_q
+        result += part
+    return result
+
+
 def sanitize_post_text(text: str) -> str:
     """投稿テキストから禁止文字を除去・変換する（最終防衛線）"""
-    text = re.sub(r'\*\*(.+?)\*\*', r'「\1」', text)
-    text = text.replace('*', '')
-    text = text.replace('"', '').replace("'", '')
-    text = text.replace('“', '').replace('”', '')
-    text = text.replace('‘', '').replace('’', '')
-    text = text.replace('`', '')
+    # **xxx** -> 「xxx」
+    text = re.sub(r'\*\*([^*\n]+?)\*\*', r'「\1」', text)
+    # *xxx* -> 「xxx」
+    text = re.sub(r'(?<!\*)\*([^*\n]+?)\*(?!\*)', r'「\1」', text)
+    text = text.replace("**", "")
+    text = text.replace("*", "")
+    text = text.replace("`", "")
+    # スマートクォート(全角) -> 「」（\u エスケープ表記で再破損を防ぐ）
+    text = text.replace("“", "「").replace("”", "」")
+    text = text.replace("‘", "「").replace("’", "」")
+    # 半角クォート -> 開閉ペア交互置換
+    text = _replace_quotes_alternating(text, '"', '「', '」')
+    text = _replace_quotes_alternating(text, "'", '「', '」')
     return text
 
 
@@ -381,17 +449,23 @@ def main():
         if malfoy_feedback:
             logger.info("マルフォイの差し戻しコメントを取得しました。フィードバックを反映して再生成します。")
 
-        posts = generate_posts(briefing, voice_def, ref_posts, malfoy_feedback)
+        theme_directives = load_theme_directives(_cli_theme())
+        if theme_directives:
+            logger.info(f"テーマ指定を反映します（{len(theme_directives)}文字）")
+        else:
+            logger.info("テーマ指定なし。声定義のテーマだけで書きます。")
+
+        posts = generate_posts(briefing, voice_def, ref_posts, malfoy_feedback, theme_directives)
         logger.info("投稿案3案生成完了")
 
         comment_body = f"""## ✍️ {_n('luna')}より：3時間帯投稿案 完成
 
-作成日時: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+**作成日時:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
 
 {posts}
 
 ---
-{_n('malfoy')}、3スロット分の校閲をお願いします。
+*{_n('malfoy')}、3スロット分の校閲をお願いします。*
 """
         done_ts = datetime.now().strftime("%H:%M")
         gh.add_comment(issue.number, comment_body)

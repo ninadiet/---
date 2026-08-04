@@ -21,14 +21,6 @@ from loguru import logger
 
 load_dotenv()
 
-from utils.auth_check import check_auth
-
-_auth_ok, _auth_msg = check_auth()
-if not _auth_ok:
-    import sys as _sys
-    print(f"[認証失敗] {_auth_msg}", file=_sys.stderr)
-    _sys.exit(1)
-
 THREADS_ACCESS_TOKEN    = os.getenv("THREADS_ACCESS_TOKEN")
 THREADS_USER_ID         = os.getenv("THREADS_USER_ID")
 GITHUB_TOKEN            = os.getenv("GITHUB_TOKEN")
@@ -39,7 +31,6 @@ GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/shee
 THREADS_API_BASE        = "https://graph.threads.net/v1.0"
 
 SLOT_LABELS = {
-    1: "🌅 07時・朝投稿",
     2: "🌆 18時・夕方投稿",
     3: "🌙 21時・夜投稿",
 }
@@ -113,17 +104,12 @@ def get_slot_text_from_issue(issue_number: int, gh: GitHubIssues, slot_num: int)
 
 
 def check_approved(issue_number: int, gh: GitHubIssues) -> bool:
-    """承認コメントがあるか確認（auto-approveのBotコメントも有効）"""
+    """承認コメントがあるか確認"""
     comments = gh.get_comments(issue_number)
-    for c in comments:
-        body = (c.body or "").strip()
-        if not body:
-            continue
-        if any(ng in body for ng in ["承認申請", "承認しない", "否認", "差し戻し", "保留", "承認待ち"]):
-            continue
-        if "承認" in body:
-            return True
-    return False
+    return any(
+        "承認" in c.body and c.user.type != "Bot" and "申請" not in c.body
+        for c in comments
+    )
 
 
 def find_approved_issue(gh: GitHubIssues) -> object:
@@ -149,8 +135,8 @@ def find_approved_issue(gh: GitHubIssues) -> object:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--slot", type=int, required=True, choices=[1, 2, 3],
-        help="スロット番号（1=07時, 2=18時, 3=21時）"
+        "--slot", type=int, required=True, choices=[2, 3],
+        help="スロット番号（2=18時, 3=21時）"
     )
     args = parser.parse_args()
 
@@ -167,7 +153,7 @@ def main():
 
     # Python側の投稿済みチェック（yml側チェックとの2重防止）
     # yml側のgrepがコメント形式にマッチしない場合の保険
-    slot_keyword = {1: "07時", 2: "18時", 3: "21時"}.get(args.slot, f"SLOT_{args.slot}")
+    slot_keyword = "18時" if args.slot == 2 else "21時"
     comments_for_check = gh.get_comments(issue.number)
     already_posted = any(
         slot_keyword in c.body and "投稿完了" in c.body
@@ -182,11 +168,6 @@ def main():
     if not post_text:
         logger.info(f"SLOT_{args.slot} のテキストが見つかりません。投稿をスキップします。")
         sys.exit(0)  # exit(0)=正常終了でcronを維持
-
-    # 抽出失敗プレースホルダーが混入していたら投稿しない
-    if "抽出失敗" in post_text:
-        logger.error(f"SLOT_{args.slot} テキストが抽出失敗状態のためスキップします: {post_text[:50]}")
-        sys.exit(0)
 
     logger.info(f"投稿テキスト（先頭50文字）: {post_text[:50]}...")
 

@@ -16,14 +16,6 @@ from loguru import logger
 
 load_dotenv()
 
-from utils.auth_check import check_auth
-
-_auth_ok, _auth_msg = check_auth()
-if not _auth_ok:
-    import sys as _sys
-    print(f"[認証失敗] {_auth_msg}", file=_sys.stderr)
-    _sys.exit(1)
-
 THREADS_ACCESS_TOKEN    = os.getenv("THREADS_ACCESS_TOKEN")
 GITHUB_TOKEN            = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO             = os.getenv("GITHUB_REPO")
@@ -31,8 +23,8 @@ SPREADSHEET_ID          = os.getenv("SPREADSHEET_ID", "")
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/sheets_service_account.json")
 
 THREADS_API_BASE  = "https://graph.threads.net/v1.0"
-BUZZ_THRESHOLD    = 3   # バズ判定のいいね閾値（フォロワー数桁の段階では相対的な良投稿を拾うため引き下げ）
-BUZZ_VIEWS_THRESHOLD = 500  # バズ判定の閲覧数閾値（views指標がAPI側で常時0を返す不具合があるため実質使われないが、復旧時のため引き下げ）
+BUZZ_THRESHOLD    = 30   # バズ判定のいいね閾値
+BUZZ_VIEWS_THRESHOLD = 3000  # バズ判定の閲覧数閾値
 SCRIPT_DIR        = os.path.dirname(os.path.abspath(__file__))
 BUZZ_POSTS_PATH   = os.path.join(SCRIPT_DIR, "..", "operation", "knowledge", "kb_sys_ref_v001.md")
 
