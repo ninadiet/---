@@ -61,3 +61,6 @@ new_token.txt
 # トークンを含むメモファイル（絶対にコミットしない）
 *トークン*.txt
 *token*.txt
+
+# U2認証用のDiscordユーザーID（個人識別情報・公開リポジトリに載せない）
+auth_member.txt
