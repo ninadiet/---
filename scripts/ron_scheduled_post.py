@@ -105,12 +105,17 @@ def get_slot_text_from_issue(issue_number: int, gh: GitHubIssues, slot_num: int)
 
 
 def check_approved(issue_number: int, gh: GitHubIssues) -> bool:
-    """承認コメントがあるか確認"""
+    """承認コメントがあるか確認（auto-approveのBotコメントも有効）"""
     comments = gh.get_comments(issue_number)
-    return any(
-        "承認" in c.body and c.user.type != "Bot" and "申請" not in c.body
-        for c in comments
-    )
+    for c in comments:
+        body = (c.body or "").strip()
+        if not body:
+            continue
+        if any(ng in body for ng in ["承認申請", "承認しない", "否認", "差し戻し", "保留", "承認待ち"]):
+            continue
+        if "承認" in body:
+            return True
+    return False
 
 
 def find_approved_issue(gh: GitHubIssues) -> object:
