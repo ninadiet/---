@@ -54,7 +54,7 @@ jobs:
             echo "Current JST time (${JST_HOUR}:${JST_MIN}) is outside 07:30-11:00 window. Skipping."
             exit 0
           fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$CURRENT" -gt "$MAX_LATE" ] && [ "false" = "true" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$CURRENT" -gt "$MAX_LATE" ]; then
             echo "should_run=SKIP" >> "$GITHUB_OUTPUT"
             echo "Manual dispatch at ${JST_HOUR}:${JST_MIN} is too late (>11:30). Skipping."
             exit 0
