@@ -55,13 +55,31 @@ jobs:
           python ron_auto_measure.py --target-date "${{ github.event.inputs.target_date }}"
 
       - name: Commit kb_sys_ref_v001.md if updated
+        if: always()   # 計測が一部失敗しても書けた分は残す（2026-08-25）
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add operation/knowledge/kb_sys_ref_v001.md 2>/dev/null || true
+          # low_er_posts.md は「反省サンプル（自動蓄積）」と説明しているのに
+          # コミット対象から漏れており、毎回まっさらに戻って1件も溜まらなかった（2026-08-23 発見）。
+          git add operation/knowledge/low_er_posts.md 2>/dev/null || true
+          # 型の採点結果（2026-08-25 追加。コミットしないと学習が毎日リセットされる）
+          git add operation/memory/type_scores.csv 2>/dev/null || true
+          git add operation/strategy/type_pool.json 2>/dev/null || true
+          git add operation/weekly/type_report.md 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
             git commit -m "auto: バズ投稿ナレッジを追記"
             git push
+          fi
+
+      - name: 🚨 失敗をDiscordへ通知（2026-08-25 追加）
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          # 投稿・計測が落ちても誰にも伝わらず、欠落に気づけなかった（診断で発覚）
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -s -X POST "$DISCORD_WEBHOOK_URL" -H "Content-Type: application/json"               -d "{\"username\":\"🚨 ワークフロー監視\",\"content\":\"⚠️ ${{ github.workflow }} が失敗しました。Actionsのログを確認してください。\"}"               || echo "Discord notify failed"
           fi

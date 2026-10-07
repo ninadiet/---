@@ -6,9 +6,9 @@ description: 週次コンテンツ戦略会議を実施するスキル。ハリ�
 # 週次コンテンツ戦略会議
 
 ## 準備
-- サブエージェントとして、ハリーエージェント(`.github/agents/harry.agent.md`)をモデル"gemini-1.5-flash"で実行します。
-- サブエージェントとして、ハーマイオニーエージェント(`.github/agents/hermione.agent.md`)をモデル"gemini-1.5-flash"で実行します。
-- サブエージェントとして、スネイプエージェント(`.github/agents/snape.agent.md`)をモデル"gemini-1.5-flash"で実行します。
+- サブエージェントとして、ハリーエージェント(`.github/agents/harry.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
+- サブエージェントとして、ハーマイオニーエージェント(`.github/agents/hermione.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
+- サブエージェントとして、スネイプエージェント(`.github/agents/snape.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
 
 ## 事前確認
 1. `operation/weekly/` から前週の記録を確認する

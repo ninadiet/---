@@ -7,7 +7,9 @@ ron_fetch.py
 import os
 import argparse
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+JST = timezone(timedelta(hours=9))  # 2026-08-26 統一（UTCズレ事故の根絶）
 from utils.github_issues import GitHubIssues
 from utils.sheets_logger import update_engagement
 from utils.agent_config import name as _n
@@ -161,14 +163,14 @@ def main():
     views     = insights.get("views", 0)
 
     is_buzz   = likes >= BUZZ_THRESHOLD or views >= BUZZ_VIEWS_THRESHOLD
-    date_str  = datetime.now().strftime("%Y-%m-%d")
+    date_str  = datetime.now(JST).strftime("%Y-%m-%d")
     theme     = get_theme_from_issue(issue)
     post_text = get_post_text_from_issue(args.issue_number, gh)
 
     # GitHub Issueに計測結果を記録
     comment_body = f"""## 📊 {_n('ron')}より：エンゲージメント計測結果（24時間後）
 
-**計測日時:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
+**計測日時:** {datetime.now(JST).strftime('%Y-%m-%d %H:%M')}
 **投稿ID:** `{args.post_id}`
 
 ### ▼ エンゲージメント（24時間）

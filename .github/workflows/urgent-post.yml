@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  issues: write   # 下書きIssue作成・承認コメントに必要（2026-08-25 診断で403リスク発覚）
 
 env:
   DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}

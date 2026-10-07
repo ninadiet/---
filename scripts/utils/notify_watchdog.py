@@ -5,6 +5,8 @@ gas-watchdog.yml から呼び出す（heredocのYAML構文エラーを避ける�
 """
 
 import os
+from datetime import timezone, timedelta
+JST = timezone(timedelta(hours=9))
 import sys
 import requests
 import datetime
@@ -12,7 +14,7 @@ import datetime
 
 def send_watchdog_alert(status: str, webhook_url: str) -> None:
     """Watchdog警報をDiscordに送信する"""
-    now_str = datetime.datetime.now().strftime("%H:%M JST")
+    now_str = datetime.datetime.now(JST).strftime("%H:%M JST")
 
     cause_map = {
         "no_issue": "GAS未発火の可能性（05:00に発火しなかった）",

@@ -1,0 +1,126 @@
+name: Monitor SLOT Completion (Daily Late Night)
+
+# ─────────────────────────────────────────────────────────────
+# 未投稿検知（1日の終わりに、3スロットが投稿されたかを点検して知らせる）
+# 2026-09-01 新設（オーナー承認済み）。アフィリ側キットで実績のある仕組みの移植。
+#
+# 判定の根拠は scripts/ron_post.py / scripts/ron_scheduled_post.py が
+# 実際に書く完了コメント：
+#   ・SLOT_2/3（予定投稿）: 本文中の機械マーカー <!-- SLOT_N 投稿完了 -->
+#   ・SLOT_1（承認後の投稿）: 「📤 …投稿完了」コメントのうち SLOT マーカーが無いもの
+# 役割名（ロン等）は agent_config で変更可能なため、名前には依存しない。
+# ─────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    - cron: '0 14 * * *'    # 23:00 JST（メイン）
+    - cron: '30 14 * * *'   # 23:30 JST（予備1）
+    - cron: '0 15 * * *'    # 24:00 JST（予備2・下の日付判定により前日ぶんを点検）
+    - cron: '30 15 * * *'   # 00:30 JST（予備3・同上）
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: '点検する日付（YYYY-MM-DD・空なら自動判定）'
+        required: false
+        default: ''
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Resolve target date (cron遅延で日付が翌日にずれるのを吸収)
+        id: target
+        run: |
+          JST_HOUR=$(TZ=Asia/Tokyo date +%H)
+          TODAY=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+          YDAY=$(TZ=Asia/Tokyo date -d "yesterday" +%Y-%m-%d)
+          MANUAL="${{ github.event.inputs.target_date }}"
+          # このworkflowの指定時刻は 23:00〜00:30 JST。
+          #   23時台に動いている       = 遅延なし → 当日ぶんを点検
+          #   それ以外（0〜22時台）    = 遅延して日付をまたいだ → 前日ぶんを点検
+          if [ -n "$MANUAL" ]; then
+            TARGET="$MANUAL"; REASON="手動指定"
+          elif [ "$((10#$JST_HOUR))" -ge 23 ]; then
+            TARGET="$TODAY"; REASON="定刻起動 → 当日ぶんを点検"
+          else
+            TARGET="$YDAY"; REASON="日付またぎ起動（cron遅延）→ 前日ぶんを点検"
+          fi
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "now=$(TZ=Asia/Tokyo date +%H:%M)" >> "$GITHUB_OUTPUT"
+          echo "点検対象: $TARGET（$REASON）"
+
+      - name: Find target date's issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TARGET="${{ steps.target.outputs.target }}"
+          NUM=$(gh api "repos/${{ github.repository }}/issues?labels=daily-operation&state=all&per_page=30" \
+            --jq ".[] | select(.title | contains(\"$TARGET\")) | .number" 2>/dev/null | head -1)
+          if [ -z "$NUM" ]; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "$TARGET のIssueが見つかりません。運用日ではない可能性。点検を終了します。"
+          else
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "number=$NUM" >> "$GITHUB_OUTPUT"
+            echo "対象Issue: #$NUM"
+          fi
+
+      - name: Check SLOT completion
+        id: check
+        if: steps.issue.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/issues/${{ steps.issue.outputs.number }}/comments?per_page=100" \
+            > /tmp/comments.json
+
+          MISSING=""
+          # SLOT_2 / SLOT_3: ron_scheduled_post.py が書く機械マーカーで判定（最も確実）
+          for SLOT in 2 3; do
+            if ! jq -e ".[] | select(.body | contains(\"<!-- SLOT_${SLOT} 投稿完了 -->\")) | .id" /tmp/comments.json > /dev/null 2>&1; then
+              MISSING="${MISSING}SLOT_${SLOT} "
+            fi
+          done
+          # SLOT_1: 「📤 …投稿完了」コメントのうち、SLOTマーカー無しのものが1件でもあれば完了
+          S1=$(jq -r '[.[] | select((.body | contains("📤")) and (.body | contains("投稿完了")) and (.body | contains("<!-- SLOT_") | not))] | length' /tmp/comments.json)
+          if [ "${S1:-0}" -eq 0 ]; then
+            MISSING="SLOT_1 ${MISSING}"
+          fi
+          MISSING=$(echo "$MISSING" | xargs || true)
+          echo "missing=$MISSING" >> "$GITHUB_OUTPUT"
+
+          # 二重通知ガード: この日のIssueに既に未投稿検知コメントがあれば再通知しない
+          if jq -e '.[] | select(.body | contains("未投稿検知")) | .id' /tmp/comments.json > /dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -z "$MISSING" ]; then
+            echo "✅ 3スロットすべて投稿完了（${{ steps.target.outputs.target }}）"
+          else
+            echo "⚠️ 未投稿: $MISSING"
+          fi
+
+      - name: Notify if incomplete
+        if: steps.issue.outputs.found == 'true' && steps.check.outputs.missing != '' && steps.check.outputs.already == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          TARGET="${{ steps.target.outputs.target }}"
+          MISSING="${{ steps.check.outputs.missing }}"
+          NOW="${{ steps.target.outputs.now }}"
+          BODY="## ⚠️ 未投稿検知（$TARGET ぶん）\n\n- 未投稿: $MISSING\n- 検知時刻: $NOW JST\n- 予定時刻の目安: SLOT_1=朝の承認後 / SLOT_2=18時ごろ / SLOT_3=21時ごろ\n- 原因候補: 承認コメント未記入 / GitHub Actions cron遅延 / Threads API障害 / トークン期限切れ\n- 対応: 今からでも投稿する場合は scheduled-post workflow を手動実行してください。翌日のサイクルは通常どおり動きます。"
+          gh api "repos/${{ github.repository }}/issues/${{ steps.issue.outputs.number }}/comments" \
+            -f body="$(printf "%b" "$BODY")" > /dev/null || echo "Issueコメント追加に失敗"
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -s -X POST "$DISCORD_WEBHOOK_URL" -H "Content-Type: application/json" \
+              -d "{\"username\":\"🚨 投稿監視\",\"content\":\"⚠️ **未投稿検知（$TARGET）: ${MISSING}**\\n承認コメントの記入漏れ、またはworkflowの失敗の可能性があります。Issue #${{ steps.issue.outputs.number }} を確認してください。\"}" \
+              || echo "Discord notify failed"
+          fi

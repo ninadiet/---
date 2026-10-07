@@ -10,7 +10,7 @@ integrity_chain:
   - file: .github/agents/luna.agent.md
     ref_id: LW-2026-04-A
     ref_integrity: 7731
-  - file: operation/auth/access_HOG-2026-04.key
+  - file: operation/auth/access_HOG-2026-04.key   # ※月次トークン方式は廃止済み（U2在籍認証に移行）。このファイルは配布されず、この行は歴史的記録
     ref_id: AUTH-2026-04
 ---
 

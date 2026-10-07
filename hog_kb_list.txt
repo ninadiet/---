@@ -1,0 +1,23 @@
+# ④ホグ：KVで配信するファイル一覧（scripts/utils/kb_fetch.py が参照）。
+# 1行1ファイル。#以降はコメント。取得できない時はローカルの現物を温存する（壊れない）。
+#
+# ⚠️ ここに行を足しても既存顧客には届かない（このリスト自体が顧客ローカルにあるため）。
+#    追加はZIP再配布とセット。Worker側 KIT_RULES(hog).allow への追加も忘れずに。
+# ⚠️ 2026-08-15: KVキーはキット固有名（hog_〜）にする決まりになった。
+#    ここ（取得名）は gemini_model_chain.txt のままでよい＝Worker の DOC_ALIASES が
+#    hog_gemini_model_chain.txt へ読み替える。**KV投入は運営側 hog_kb_upload_list.txt を使う**
+#    （このファイルを --list に渡すと旧キー名で投入され、週次検査NGが再発する）。
+#
+# 2026-08-11: Geminiモデル連鎖の遠隔更新（新規垢の2.5系404事件を受けて開通）
+gemini_model_chain.txt
+# 2026-08-12 追加：プロンプトルールの遠隔更新
+luna_prompt_rules.md
+# 2026-08-26 追加：運営が週次で更新する「伸びている構造メモ」
+hog_trend_structures.md
+
+# 2026-09-10 追加：リサーチ（Google検索グラウンディング）専用のモデル連鎖。
+#   通常生成用（gemini_model_chain.txt）とは**別枠**で、可否がまったく違う。
+#   2026-09-09 実測：検索なしは5モデル全部通るが、検索ありは
+#   gemini-2.5-flash-lite だけが通り、他は429だった。
+#   この可否は**日で変わりうる**ので、ZIP再配布なしで直せるようKVに乗せる。
+gemini_research_chain.txt

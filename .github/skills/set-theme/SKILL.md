@@ -6,7 +6,7 @@ description: 今日の投稿テーマ・方向性を設定するスキル。ハ�
 # 本日のテーマ設定
 
 ## 準備
-- サブエージェントとして、ハリーエージェント(`.github/agents/harry.agent.md`)をモデル"gemini-1.5-flash"で実行します。
+- サブエージェントとして、ハリーエージェント(`.github/agents/harry.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
 
 ## 手順
 

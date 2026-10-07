@@ -1,0 +1,16 @@
+# リサーチ（Google検索グラウンディング）専用のモデル試行順
+# 通常の生成用（gemini_model_chain.txt）とは**別枠**なので分けてある。
+# 上から順に試し、引用が取れなければ次のモデルへ。
+#
+# 2026-09-09 実測（生curlとSDKの両方で確認）:
+#   モデル                     検索なし  検索あり
+#   gemini-2.5-flash            OK       429（20回/日で打ち止め）
+#   gemini-2.5-flash-lite       OK       OK（12回連続成功・上限に当たらず）
+#   gemini-flash-latest         OK       429
+#   gemini-3-flash-preview      OK       429
+#   gemini-flash-lite-latest    OK       429
+#   → 検索が通るのは lite だけだった。ただし可用性は日で変わるので連鎖にしてある。
+# 書式: 1行1モデル。# 以降はコメント。
+gemini-2.5-flash-lite
+gemini-2.5-flash
+gemini-flash-latest

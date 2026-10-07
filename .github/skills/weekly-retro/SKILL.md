@@ -6,8 +6,8 @@ description: 週次振り返りと改善計画を実施するスキル。スネ�
 # 週次振り返り（レトロスペクティブ）
 
 ## 準備
-- サブエージェントとして、スネイプエージェント(`.github/agents/snape.agent.md`)をモデル"gemini-1.5-flash"で実行します。
-- サブエージェントとして、ハリーエージェント(`.github/agents/harry.agent.md`)をモデル"gemini-1.5-flash"で実行します。
+- サブエージェントとして、スネイプエージェント(`.github/agents/snape.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
+- サブエージェントとして、ハリーエージェント(`.github/agents/harry.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
 
 ## 事前確認
 1. `operation/weekly/weekly_review_YYYYWXX.md` を確認する（週次レビューが完了していること）

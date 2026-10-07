@@ -6,10 +6,10 @@ description: 週次パフォーマンスレビューを実施するスキル。1
 # 週次パフォーマンスレビュー
 
 ## 準備
-- サブエージェントとして、ハリーエージェント(`.github/agents/harry.agent.md`)をモデル"gemini-1.5-flash"で実行します。
-- サブエージェントとして、ハーマイオニーエージェント(`.github/agents/hermione.agent.md`)をモデル"gemini-1.5-flash"で実行します。
-- サブエージェントとして、ロンエージェント(`.github/agents/ron.agent.md`)をモデル"gemini-1.5-flash"で実行します。
-- サブエージェントとして、スネイプエージェント(`.github/agents/snape.agent.md`)をモデル"gemini-1.5-flash"で実行します。
+- サブエージェントとして、ハリーエージェント(`.github/agents/harry.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
+- サブエージェントとして、ハーマイオニーエージェント(`.github/agents/hermione.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
+- サブエージェントとして、ロンエージェント(`.github/agents/ron.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
+- サブエージェントとして、スネイプエージェント(`.github/agents/snape.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
 
 ## 対象期間
 今週月曜〜本日（金曜または日曜）のGitHub Issues「投稿実績ログ」ラベルのIssueを全件確認する。

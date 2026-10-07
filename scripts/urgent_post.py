@@ -11,12 +11,15 @@ import sys
 import re
 import argparse
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+JST = timezone(timedelta(hours=9))  # 2026-08-26 統一（UTCズレ事故の根絶）
 from utils.github_issues import GitHubIssues
 from utils.gemini_client import call_gemini
 from utils.agent_config import name as _n
 from dotenv import load_dotenv
 from loguru import logger
+from utils import post_guard
 
 load_dotenv()
 
@@ -97,7 +100,7 @@ def generate_urgent_post(idea: str, voice_def: str) -> str:
 ## 制約
 - 300文字以内
 - 禁止語尾: 「〜です」「〜ます」「〜ください」
-- 禁止文字: * " ' ` （強調は「」を使う）
+- 禁止文字: * " ' ` （強調は文の流れと改行で出す。「」は感情と会話だけ）
 - 冒頭に固有名詞（Claude Code/ChatGPT/Gemini/OpenClaw等）を入れる
 - 感情フックを必ず1つ入れる
 - 最後にCTA（価値提示）を入れる
@@ -112,7 +115,7 @@ def generate_urgent_post(idea: str, voice_def: str) -> str:
 def save_draft_to_issue(idea: str, post_text: str) -> tuple[int, str]:
     """下書きをGitHub Issueに保存し、(issue_number, issue_url) を返す"""
     gh = GitHubIssues(GITHUB_TOKEN, GITHUB_REPO)
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    now = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
     title = f"[緊急投稿下書き] {now} - {idea[:40]}"
     body = f"""## 📥 緊急投稿下書き
 
@@ -224,6 +227,17 @@ def run_approve() -> None:
         sys.exit(0)
 
     logger.info(f"下書き取得: Issue #{issue_number}, {len(post_text)}文字")
+
+    # ── 投稿してはいけないテキストの最終関所（2026-09-01・共通化）──────────
+    # 判定は utils/post_guard.py に一本化した。以前はキットごとに別実装で、
+    # ③にはあった検査が④に無く、`（SLOT_3 抽出失敗）` が実際に公開された。
+    _reason = post_guard.unpostable_reason(post_text)
+    if _reason:
+        msg = (f"⚠️ 下書きは投稿できません（{_reason}）。投稿を中止しました。"
+               f"下書きを直してから再承認してください。{chr(10)}{chr(10)}{post_text[:200]}")
+        notify_discord(msg)
+        logger.error(msg)
+        sys.exit(1)
 
     result = post_to_threads(post_text)
     if result:

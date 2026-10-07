@@ -38,7 +38,7 @@ GitHub Actionsのcronは数時間遅延することがあります。
 ```javascript
 const GITHUB_OWNER = '{GitHubユーザー名}';
 const GITHUB_REPO  = '{リポジトリ名}';
-const BRANCH_REF   = 'main';  // デフォルトブランチが master の場合は 'master' に変更
+const BRANCH_REF   = 'master';  // このキットの手順で作ると master になります（main の場合は 'main' に変更）
 
 function triggerSlot2() {
   triggerWorkflow('scheduled-post-slot2.yml', 'SLOT_2');

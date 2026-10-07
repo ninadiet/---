@@ -6,11 +6,11 @@ description: Threads運用の6ステップ・日次ループを実行するス�
 # 6ステップ・日次運用ループ実行
 
 ## 準備
-- サブエージェントとして、ハーマイオニーエージェント(`.github/agents/hermione.agent.md`)をモデル"gemini-1.5-flash"で実行します。
-- サブエージェントとして、ルーナエージェント(`.github/agents/luna.agent.md`)をモデル"gemini-1.5-flash"で実行します。
-- サブエージェントとして、マルフォイエージェント(`.github/agents/malfoy.agent.md`)をモデル"gemini-1.5-flash"で実行します。
-- サブエージェントとして、ロンエージェント(`.github/agents/ron.agent.md`)をモデル"gemini-1.5-flash"で実行します。
-- サブエージェントとして、ハリーエージェント(`.github/agents/harry.agent.md`)をモデル"gemini-1.5-flash"で実行します。
+- サブエージェントとして、ハーマイオニーエージェント(`.github/agents/hermione.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
+- サブエージェントとして、ルーナエージェント(`.github/agents/luna.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
+- サブエージェントとして、マルフォイエージェント(`.github/agents/malfoy.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
+- サブエージェントとして、ロンエージェント(`.github/agents/ron.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
+- サブエージェントとして、ハリーエージェント(`.github/agents/harry.agent.md`)をPythonスクリプト内のGemini呼び出し（自動フォールバック付き）で実行します。
 
 ## 事前確認
 1. `operation/themes/` から最新の `themeXXX.md` を読み、本日のテーマを確認する

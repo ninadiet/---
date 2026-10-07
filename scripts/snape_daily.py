@@ -574,8 +574,20 @@ def check_consistency(post_text: str, briefing: str, luna_posts: str) -> dict:
 """
     result = call_gemini(prompt, GEMINI_API_KEY)
 
-    consistency_match = re.search(r"総合整合スコア.*?(\d+)", result)
-    consistency_score = int(consistency_match.group(1)) if consistency_match else 5
+    # ★2026-08-21 修正: 旧 re.search(r"総合整合スコア.*?(\d+)", result) は
+    #   プロンプトの見出しに書いた**範囲指定「（1-10）」の 1** を先に拾うため、
+    #   整合スコアが導入以来ずっと 1/10 固定になり is_consistent が常に False だった。
+    #   ラベルの出現位置から「同じ行＋次の1行」だけを見て、範囲指定と分母(/100 等)を
+    #   落としてから最初の整数を取る（本体 scripts/utils/slot_qc.py の parse_score と同じ直し方）。
+    consistency_score = 5
+    _sm = re.search("総合整合スコア", result or "")
+    if _sm:
+        _win = "\n".join((result[_sm.end():]).split("\n")[:2])
+        _win = re.sub(r"[（(]\s*\d+\s*[-−〜~ー–]\s*\d+\s*(?:点|score)?\s*[)）]", " ", _win)
+        _win = re.sub(r"/\s*\d+", " ", _win)
+        _nm = re.search(r"(\d+)", _win)
+        if _nm and 0 <= int(_nm.group(1)) <= 10:
+            consistency_score = int(_nm.group(1))
 
     return {
         "score": consistency_score,

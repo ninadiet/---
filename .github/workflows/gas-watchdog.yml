@@ -11,7 +11,7 @@ name: GAS Watchdog - Daily Cycle Monitor
 
 on:
   schedule:
-    - cron: '30 21 * * *'  # 06:30 JST（GAS 05:00 発火後の確認）
+    - cron: '45 21 * * *'   # 06:45 JST（06:30だとdaily-cycle予備1=06:26の処理中に重なり二重起動しうる・2026-08-25診断）  # 06:30 JST（GAS 05:00 発火後の確認）
   workflow_dispatch:
 
 permissions:
@@ -91,7 +91,7 @@ jobs:
           echo "Triggering daily-cycle recovery..."
           gh api "repos/${{ github.repository }}/actions/workflows/daily-cycle.yml/dispatches" \
             -X POST \
-            -f ref=${{ github.ref_name }} \
+            -f ref=master \
             -f inputs='{}' || echo "Failed to trigger daily-cycle"
 
       - name: Notify Discord - watchdog alert

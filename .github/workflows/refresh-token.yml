@@ -56,5 +56,5 @@ jobs:
             RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             curl -s -X POST "$DISCORD_WEBHOOK_URL" \
               -H "Content-Type: application/json" \
-              -d "{\"content\": \"⚠️ **Threadsトークン自動更新に失敗しました**\\n手動更新が必要です。\\n\\n手順: operation/knowledge/kb_update_202605_maintenance.md の「緊急時：Threadsトークン手動更新手順」\\nログ: $RUN_URL\"}"
+              -d "{\"content\": \"⚠️ **Threadsトークン自動更新に失敗しました**\\n手動更新が必要です。\\n\\n手順: Meta開発者画面で長期トークンを再発行 → GitHubのSettings→Secrets→THREADS_ACCESS_TOKEN を差し替え（詳細はキットのREADME「トークン更新」）\\nログ: $RUN_URL\"}"
           fi

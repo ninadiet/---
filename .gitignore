@@ -57,10 +57,3 @@ new_token.txt
 *.pem
 *.key
 *.p12
-
-# トークンを含むメモファイル（絶対にコミットしない）
-*トークン*.txt
-*token*.txt
-
-# U2認証用のDiscordユーザーID（個人識別情報・公開リポジトリに載せない）
-auth_member.txt

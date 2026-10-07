@@ -68,3 +68,13 @@ jobs:
             export GOOGLE_CREDENTIALS_PATH=credentials/sheets_service_account.json
           fi
           python scripts/ron_scheduled_post.py --slot 3
+
+      - name: 🚨 失敗をDiscordへ通知（2026-08-25 追加）
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          # 投稿・計測が落ちても誰にも伝わらず、欠落に気づけなかった（診断で発覚）
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -s -X POST "$DISCORD_WEBHOOK_URL" -H "Content-Type: application/json"               -d "{\"username\":\"🚨 ワークフロー監視\",\"content\":\"⚠️ ${{ github.workflow }} が失敗しました。Actionsのログを確認してください。\"}"               || echo "Discord notify failed"
+          fi

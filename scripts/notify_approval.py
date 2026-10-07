@@ -6,7 +6,9 @@ Discord Webhook（推奨・無料）または Make Webhook に対応
 
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+JST = timezone(timedelta(hours=9))  # 2026-08-26 統一（UTCズレ事故の根絶）
 from utils.github_issues import GitHubIssues
 from utils.discord_notify import send_approval_request
 from dotenv import load_dotenv
@@ -31,7 +33,7 @@ def notify_make(issue_number: int, issue_url: str, issue_title: str):
             f"GitHub Issueに「承認」とコメントしてください。\n"
             f"{issue_url}"
         ),
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(JST).isoformat(),
     }
     resp = requests.post(MAKE_WEBHOOK_URL, json=payload)
     if resp.status_code == 200:
@@ -52,7 +54,7 @@ def main():
             DISCORD_WEBHOOK_URL,
             {},  # ステータスはmalfoy_review.pyが既に送付済みのためここでは省略
             issue.number, issue.html_url,
-            datetime.now().strftime("%Y-%m-%d"),
+            datetime.now(JST).strftime("%Y-%m-%d"),
         )
         sent = True
 

@@ -6,7 +6,9 @@ snape_report.py
 
 import os
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+JST = timezone(timedelta(hours=9))  # 2026-08-26 統一（UTCズレ事故の根絶）
 from pathlib import Path
 from utils.github_issues import GitHubIssues
 from dotenv import load_dotenv
@@ -25,7 +27,7 @@ API_USAGE_CSV   = WEEKLY_DIR / "api_usage_log.csv"
 
 def get_weekly_issues(gh: GitHubIssues) -> list:
     """今週（月〜日）の運用ループIssueを取得する"""
-    today  = datetime.now()
+    today  = datetime.now(JST)
     monday = today - timedelta(days=today.weekday())
     monday_str = monday.strftime("%Y-%m-%d")
 
@@ -125,7 +127,7 @@ def main():
         weekly_issues.append({"issue": issue, "engagement": engagement})
 
     # 週番号
-    now      = datetime.now()
+    now      = datetime.now(JST)
     week_str = now.strftime("%Y年W%V")
     week_num = now.strftime("%YW%V")
 

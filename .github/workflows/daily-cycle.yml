@@ -14,7 +14,7 @@ on:
 
 permissions:
   issues: write
-  contents: read
+  contents: write        # リサイクル履歴を残すため（2026-08-21）
 
 env:
   DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
@@ -35,6 +35,11 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
+
+      # 運営KVから設定を取得（モデル連鎖の遠隔更新・2026-08-11）。
+      # || true ＝ このステップは何があってもサイクルを止めない（取得失敗時は内蔵設定で動く）
+      - name: Fetch operator-managed config (fail-open)
+        run: python scripts/utils/kb_fetch.py || true
 
       - name: Check if today already completed
         id: skip_check
@@ -108,3 +113,28 @@ jobs:
               exit $exit_code
             fi
           done
+
+      # 📝 学習データのコミット（2026-08-25 全面改訂）
+      # ⚠️ このステップは必ず**workflowの最後**に置くこと。
+      #    以前は途中に置かれており、後段のステップが書くファイル
+      #    （post_history.jsonl 等）がコミットされず毎日消えていた
+      #    （診断で発覚。「git add はあるのに実行順序が逆」という形の再発だった）。
+      # ⚠️ continue-on-error と `push ||` も外さないこと。
+      #    途中で失敗しても本編を殺さない・push衝突時は諦めて翌日に任せる。
+      - name: 📝 学習データをコミット（最終ステップ・順序を変えない）
+        if: always()
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add operation/knowledge/recycling_tracker.json 2>/dev/null || true
+          git add operation/memory/post_history.jsonl 2>/dev/null || true
+          git add operation/memory/type_scores.csv 2>/dev/null || true
+          git add operation/strategy/type_pool.json 2>/dev/null || true
+          git add operation/weekly/type_report.md 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "auto: 学習データを記録（重複回避・型の成績）"
+            git push || echo "push できませんでした（今回ぶんの学習記録は翌日に持ち越し。処理は続行）"
+          fi

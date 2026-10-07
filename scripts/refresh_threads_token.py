@@ -7,7 +7,9 @@ GitHub Actions から50日ごとに自動実行される
 import os
 import requests
 import sys
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+JST = timezone(timedelta(hours=9))  # 2026-08-26 統一（UTCズレ事故の根絶）
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -60,7 +62,7 @@ def update_github_secret(new_token: str):
 
 def main():
     logger.info("=== Threadsトークン自動リフレッシュ開始 ===")
-    logger.info(f"実行日時: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    logger.info(f"実行日時: {datetime.now(JST).strftime('%Y-%m-%d %H:%M')}")
 
     if not THREADS_ACCESS_TOKEN:
         logger.error("THREADS_ACCESS_TOKEN が設定されていません")

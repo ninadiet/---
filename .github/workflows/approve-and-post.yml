@@ -36,6 +36,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
+      # ⚠️ 2026-08-21 追加（③の顧客報告と同型を横展開）：認証ステップが無く、
+      #    呼び出すスクリプトの認証チェックが失敗していた。daily-cycle と同じ形に揃える。
+      - name: 🔐 在籍認証＋運営配信の設定取得（fail-open）
+        env:
+          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
+        run: |
+          echo "$DISCORD_USER_ID" > auth_member.txt
+          python scripts/utils/kb_fetch.py || true
+
       - name: Post SLOT_1 immediately
         env:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}

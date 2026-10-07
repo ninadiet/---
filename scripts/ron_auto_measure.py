@@ -334,7 +334,22 @@ def judge_performance(likes: int, views: int, er: float) -> tuple[str, str]:
     return "📝 普通", f"ER{er}%"
 
 
-def should_save_as_knowledge(likes: int, views: int, er: float, is_follower_growth_day: bool) -> tuple[bool, str, str]:
+def _is_relative_win(views: int, target_date: str = "") -> bool:
+    """自分の直近28日の閲覧中央値の3倍を超えたら「勝ち」（2026-08-25 追加）。
+
+    従来の保管条件は「いいね30以上 or 閲覧3000以上」の絶対値だけで、
+    立ち上げ期のアカウント（フォロワー数十人）は何ヶ月経っても1件も保存されず、
+    学習が永久に始まらなかった（実利用者の実測で確認）。
+    自分比の基準を OR で足すことで、規模によらず初週から学習が動く。"""
+    try:
+        from utils import type_engine
+        return type_engine.is_relative_win(views, target_date)
+    except Exception:
+        return False
+
+
+def should_save_as_knowledge(likes: int, views: int, er: float, is_follower_growth_day: bool,
+                             target_date: str = "") -> tuple[bool, str, str]:
     """
     ナレッジ保管先を判定する。
     Returns: (should_save, target, reason)
@@ -351,6 +366,8 @@ def should_save_as_knowledge(likes: int, views: int, er: float, is_follower_grow
     # いいね・閲覧の旧基準は buzz 保管の対象外（low_er判定のみ）
     if likes >= BUZZ_LIKES_THRESHOLD:
         return True, "buzz", f"いいね{likes}件バズ"
+    if _is_relative_win(views, target_date):
+        return True, "buzz", f"自分の平常時の3倍超の閲覧（{views}件・自分比の勝ち）"
     if views >= BUZZ_VIEWS_THRESHOLD:
         return True, "buzz", f"閲覧{views}件バズ"
     # 閲覧≥1000だがER<2%の投稿は反省サンプルとしてlow_erに記録
@@ -392,6 +409,46 @@ def save_low_er_record(post_text: str, likes: int, views: int, er: float,
         logger.info(f"低ER記録保管: {slot_label} ({reason}) → low_er_posts.md")
     except Exception as e:
         logger.warning(f"low_er_posts.md 書き込み失敗: {e}")
+
+
+# ── 計測日の決め方と二重計測ガード（2026-08-06 本体から移植）──────────────
+# cron を変えたら環境変数 MEASURE_ANCHOR_JST で合わせる（auto-measure.yml の JST 時刻）
+MEASURE_ANCHOR_JST = os.getenv("MEASURE_ANCHOR_JST", "22:17")
+# 計測レポート見出しに必ず含まれる文字列（＝このIssueは計測済み、の印）
+MEASURED_MARKER = "エンゲージメント自動計測結果"
+
+
+def resolve_anchor_date(now: datetime | None = None):
+    """計測の基準日（= cron が着火するはずだった JST 日付）を返す。
+
+    ■ なぜ now.date() ではダメか（本体で 2026-07-30 に実害を確認）
+      GitHub Actions の schedule は混雑で遅延し、22:17 JST 予定が翌日 0時台に
+      着火することがある。now から「昨日」を逆算すると、日付をまたいだ run は
+      本来の対象日を飛ばして翌日を測ってしまい、**間の1日が永久に未計測**になる。
+    ■ アンカー方式
+      実行時刻が cron 予定時刻より前なら「遅延で日付をまたいだ run」と判断して
+      前日にアンカーする。これで 23:56 着火でも 00:04 着火でも同じ日を指す。
+    """
+    now = now or datetime.now(JST)
+    try:
+        anchor_h, anchor_m = (int(x) for x in MEASURE_ANCHOR_JST.split(":"))
+    except (ValueError, AttributeError):
+        logger.warning(f"MEASURE_ANCHOR_JST の書式が不正: {MEASURE_ANCHOR_JST!r} → 22:17 を使用")
+        anchor_h, anchor_m = 22, 17
+    scheduled = now.replace(hour=anchor_h, minute=anchor_m, second=0, microsecond=0)
+    if now < scheduled:
+        now = now - timedelta(days=1)
+    return now.date()
+
+
+def already_measured(comments: list) -> bool:
+    """このIssueに既に自動計測レポートが投稿済みかを判定する。
+
+    Sheets更新は上書きで無害だが、ナレッジ追記とIssueコメントは**非冪等**
+    （同じ日を2回処理すると行とコメントが二重に増える）。
+    手動実行や再実行で二重処理が起きうるため、物理的に防ぐ。
+    """
+    return any(MEASURED_MARKER in (c.body or "") for c in comments)
 
 
 def find_target_issue(gh: GitHubIssues, target_date: str):
@@ -490,7 +547,9 @@ def main():
     if args.target_date:
         target_date = args.target_date
     else:
-        target_date = (datetime.now(JST) - timedelta(days=1)).strftime("%Y-%m-%d")
+        # ⚠️ now から「昨日」を逆算しない。cron 遅延で日付をまたいだ run が
+        #    1日飛ばす問題を、アンカー方式で防ぐ（resolve_anchor_date 参照）
+        target_date = (resolve_anchor_date() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     logger.info(f"=== ロン 自動計測開始 (対象日: {target_date}) ===")
 
@@ -507,6 +566,11 @@ def main():
         sys.exit(0)
 
     logger.info(f"対象Issue: #{issue.number} - {issue.title}")
+
+    # 二重計測ガード：既にレポート済みならスキップ（再実行・手動実行対策）
+    if already_measured(gh.get_comments(issue.number)):
+        logger.info(f"{target_date} は計測レポート済み。スキップします（二重追記防止）。")
+        sys.exit(0)
 
     # 投稿IDを抽出
     post_entries = extract_post_ids(issue, gh)
@@ -585,6 +649,33 @@ def main():
                 "ratio_pct": round(ratio * 100, 1),
             }
 
+
+    # ── 型の採点（2026-08-25 追加・型の勝ち残りゲーム）────────────────────
+    # 今日の実測を「自分の直近28日の中央値」との比で採点し、型の成績を更新する。
+    # 採点に失敗しても計測本体は止めない（採点は学習のため、計測は報告のため）。
+    try:
+        from utils import type_engine
+        _tm = {}
+        for _pid, _sn, _pt, _data in results:
+            if _data is not None:
+                _tm[str(_sn)] = {"views": _data.get("views", 0),
+                                 "likes": _data.get("likes", 0)}
+        if _tm:
+            type_engine.score_day(target_date, _tm, follower_gain=follower_diff)
+            # 手の内ストックにも同じ実測を渡す（2026-09-12 追加）。
+            # 伸びた投稿に使った項目だけ ★ が付き、一定日数あけて再登板する。
+            # ⚠️ 落ちても計測は止めない（投稿には影響しない）。
+            try:
+                from utils import howto_stock as _hs
+                _r = _hs.score_day(target_date, _tm)
+                if _r.get("marked"):
+                    logger.info("手の内ストック：伸びた項目に★を付けました（%d件）" % _r["marked"])
+            except Exception as _hse:
+                logger.warning("手の内ストックの採点をスキップ: %s" % _hse)
+            logger.info("型の採点を記録しました（operation/memory/type_scores.csv）")
+    except Exception as _tse:
+        logger.warning("型の採点をスキップ: %s" % _tse)
+
     # ── ナレッジ保管判定 + レポート生成 ──
     now = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
     report_lines = [
@@ -624,7 +715,7 @@ def main():
         # ナレッジ保管判定
         should_save, save_target, save_reason = should_save_as_knowledge(
             likes, views, er, is_follower_growth_day
-        )
+        , target_date=target_date)
         if should_save and post_text:
             if save_target == "buzz":
                 save_knowledge(post_text, likes, views, er, target_date, label, save_reason, follower_diff)

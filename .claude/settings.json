@@ -10,7 +10,21 @@
       "Edit(scripts/utils/auth_check.py)",
       "Edit(.github/**)",
       "Edit(operation/auth/**)",
-      "Edit(operation/knowledge/**)"
+      "Edit(operation/knowledge/luna_prompt_rules.md)",
+      "Edit(operation/knowledge/hog_growth_basics.md)",
+      "Edit(operation/knowledge/kb_update_202605_maintenance.md)",
+      "Edit(operation/knowledge/recycling_tracker.json)",
+      "Edit(operation/knowledge/low_er_posts.md)",
+      "Write(CLAUDE.md)",
+      "Write(.claude/settings.json)",
+      "Write(SYS_VER_LOCK.md)",
+      "Write(scripts/utils/auth_check.py)",
+      "Write(.github/**)",
+      "Write(operation/auth/**)",
+      "Write(operation/knowledge/luna_prompt_rules.md)",
+      "Write(operation/knowledge/hog_growth_basics.md)",
+      "Edit(operation/knowledge/hog_trend_structures.md)",
+      "Write(operation/knowledge/hog_trend_structures.md)"
     ]
   }
 }

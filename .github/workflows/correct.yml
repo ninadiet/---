@@ -7,7 +7,7 @@ on:
 
 permissions:
   issues: write
-  contents: read
+  contents: write   # 学習データを残すため（2026-08-25）
 
 env:
   DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
@@ -52,3 +52,28 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python scripts/malfoy_review.py
+
+      # 📝 学習データのコミット（2026-08-25 全面改訂）
+      # ⚠️ このステップは必ず**workflowの最後**に置くこと。
+      #    以前は途中に置かれており、後段のステップが書くファイル
+      #    （post_history.jsonl 等）がコミットされず毎日消えていた
+      #    （診断で発覚。「git add はあるのに実行順序が逆」という形の再発だった）。
+      # ⚠️ continue-on-error と `push ||` も外さないこと。
+      #    途中で失敗しても本編を殺さない・push衝突時は諦めて翌日に任せる。
+      - name: 📝 学習データをコミット（最終ステップ・順序を変えない）
+        if: always()
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add operation/knowledge/recycling_tracker.json 2>/dev/null || true
+          git add operation/memory/post_history.jsonl 2>/dev/null || true
+          git add operation/memory/type_scores.csv 2>/dev/null || true
+          git add operation/strategy/type_pool.json 2>/dev/null || true
+          git add operation/weekly/type_report.md 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "auto: 学習データを記録（重複回避・型の成績）"
+            git push || echo "push できませんでした（今回ぶんの学習記録は翌日に持ち越し。処理は続行）"
+          fi

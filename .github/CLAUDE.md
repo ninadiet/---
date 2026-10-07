@@ -37,6 +37,6 @@ integrity_ref: SYS_VER_LOCK.md
 - api_key_hardcode: forbidden
 - human_gate: required_before_post
 - venv: .venv
-- llm_primary: gemini-1.5-flash
+- llm_primary: （スクリプト内の自動フォールバック連鎖に委譲）
 - cost_monitor: sp_agent (weekly)
 - kb_integrity: verify_on_start

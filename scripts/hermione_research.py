@@ -14,11 +14,23 @@ from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from utils.github_issues import GitHubIssues, PIPELINE_STEPS
 from utils.gemini_client import call_gemini
+from utils.web_research import run_daily_research
 from utils.agent_config import name as _n
 from dotenv import load_dotenv
 from loguru import logger
 
 load_dotenv()
+
+# ── JST（2026-08-06 本体から移植）─────────────────────────────
+# daily-cycle の cron は UTC 20:37（=JST 05:37）に着火する。GitHub Actions の
+# ランナーは UTC なので、素の datetime.now() で日付を作ると朝の実行では
+# **毎回「前日」になる**（リサイクルday判定・ブリーフィングの日付が1日ズレる）。
+# 日付・曜日の判断は必ず now_jst() を通すこと。
+JST = timezone(timedelta(hours=9))
+
+def now_jst() -> datetime:
+    """運用上の「今」（JST）。日付・曜日の判断は必ずこれを通す。"""
+    return datetime.now(JST)
 
 SPREADSHEET_ID          = os.getenv("SPREADSHEET_ID", "")
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/sheets_service_account.json")
@@ -58,12 +70,24 @@ YOUTUBE_CHANNEL_IDS = _research_cfg.get("youtube_channel_ids", [
 TOPIC_GENRE = str(_research_cfg.get("topic_genre", "")).strip()
 
 # ★ キーワード検索でトレンド動画を拾う設定（research_config.json で変更可能）
-YOUTUBE_KEYWORD_SEARCHES = _research_cfg.get("youtube_keywords", [
-    "AIエージェント Threads 活用",
-    "Claude Code SNS自動化 実例",
-    "AIエージェント 自動投稿 運用",
-    "Threads 運用 効率化 AI",
-])
+# ⚠️ 2026-08-24 修正：既定値が運営自身のジャンル（AI）に固定されていた。
+#    youtube_keywords を設定していない顧客は、自分のジャンルと無関係な
+#    AI系のトレンドを毎日リサーチし、そのブリーフィングで投稿が書かれていた
+#    （＝ジャンル外の投稿が出る／毎日同じ話題に寄る）。
+#    設定が無い時は、そのアカウントのジャンル（topic_genre）から組み立てる。
+_kw_cfg = _research_cfg.get("youtube_keywords")
+if _kw_cfg:
+    YOUTUBE_KEYWORD_SEARCHES = _kw_cfg
+elif TOPIC_GENRE:
+    YOUTUBE_KEYWORD_SEARCHES = [
+        f"{TOPIC_GENRE} コツ",
+        f"{TOPIC_GENRE} 初心者",
+        f"{TOPIC_GENRE} 続けるには",
+        f"{TOPIC_GENRE} 失敗",
+    ]
+else:
+    # ジャンル未設定＝まだ設定が終わっていない。運営のジャンルを混ぜないよう空にする。
+    YOUTUBE_KEYWORD_SEARCHES = []
 
 # ★ 購読するRSSフィード（research_config.json で変更可能）
 RSS_FEEDS = _research_cfg.get("rss_feeds", [
@@ -153,7 +177,7 @@ def search_youtube_by_keywords(max_results: int = 3) -> list[dict]:
 def get_latest_rss_news(max_per_feed: int = 3) -> list[dict]:
     """RSSフィードから最新AIニュースを取得する"""
     news_items = []
-    since = datetime.now() - timedelta(hours=48)
+    # ※ 旧実装の `since = datetime.now() - 48h` は計算するだけで未使用だったため削除（本体と同じ判断）
 
     for feed_url in RSS_FEEDS:
         try:
@@ -332,7 +356,7 @@ def check_recycle_mode() -> dict | None:
     recycling_tracker.jsonを確認し、前回リサイクルから3日以上経過していれば
     リサイクル候補の投稿情報を返す。そうでなければNoneを返す。
     """
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_jst().strftime("%Y-%m-%d")
 
     # トラッカーを読み込む（なければ初期化）
     tracker = {"interval_days": 3, "last_recycle_date": None, "history": []}
@@ -397,7 +421,7 @@ def update_recycle_tracker(post_no: str, theme: str):
     except (FileNotFoundError, json.JSONDecodeError):
         pass
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_jst().strftime("%Y-%m-%d")
     tracker["last_recycle_date"] = today
     tracker["history"].append({"date": today, "post_no": post_no, "theme": theme})
     tracker["history"] = tracker["history"][-30:]  # 直近30件まで保持
@@ -517,7 +541,7 @@ def generate_briefing(videos: list, news: list, buzz_posts: str, theme: str,
     recycle_section = ""
     if recycle_candidate:
         recycle_section = f"""
-## 🔄 本日はヒットリサイクルday（{datetime.now().strftime('%Y-%m-%d')}）
+## 🔄 本日はヒットリサイクルday（{now_jst().strftime('%Y-%m-%d')}）
 過去のヒット投稿（いいね{recycle_candidate['likes']}件）を、全く新しい形式で書き直すスロットを1つ用意すること。
 
 元の投稿No.: {recycle_candidate['post_no']}
@@ -649,12 +673,23 @@ def main():
         recycle_candidate = check_recycle_mode()
         snape_insights = load_snape_insights()
 
+        # ── 今日の裏取り（2026-09-09 追加）────────────────────────────
+        # ここまでに集めているのは YouTube のタイトルと RSS の見出しだけで、
+        # 中身の裏は一切取れていない。検索で出典のある具体（手順・数値）を拾う。
+        # ⚠️ 落ちても例外は飛ばない（空文字が返る）。検索が原因で日次サイクルを止めない。
+        _headlines = ([v.get("title", "") for v in (videos or [])][:5]
+                      + [n.get("title", "") for n in (news or [])][:5])
+        research_block = run_daily_research(theme=args.theme, genre=TOPIC_GENRE,
+                                            headlines=_headlines)
+
         briefing = generate_briefing(videos, news, buzz_posts, args.theme, performance, recycle_candidate, snape_insights)
+        if research_block:
+            briefing = briefing + chr(10) * 2 + research_block
         logger.info("ブリーフィング生成完了")
 
         comment_body = f"""## 🔍 {_n('hermione')}より：リサーチ＆分析完了
 
-**実行日時:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
+**実行日時:** {now_jst().strftime('%Y-%m-%d %H:%M')} JST
 
 {briefing}
 
@@ -662,7 +697,7 @@ def main():
 *{_n('luna')}、上記ブリーフィングをもとに投稿案3案を作成してください。*
 """
         gh.add_comment(issue.number, comment_body)
-        done_ts = datetime.now().strftime("%H:%M")
+        done_ts = now_jst().strftime("%H:%M")
         gh.update_pipeline_status(issue.number, "hermione", "done", done_ts)
         logger.info(f"GitHub Issue #{issue.number} にコメントを追加しました")
 

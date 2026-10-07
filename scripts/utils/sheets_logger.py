@@ -5,7 +5,9 @@ sheets_logger.py
 
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+JST = timezone(timedelta(hours=9))  # 2026-08-26 統一（UTCズレ事故の根絶）
 from loguru import logger
 
 try:
@@ -110,7 +112,7 @@ def log_post(
         text4 = parts[3] if len(parts) > 3 else ""
         text5 = parts[4] if len(parts) > 4 else ""
 
-        now = datetime.now()
+        now = datetime.now(JST)
         slot_labels = {1: "SLOT_1 (7時)", 2: "SLOT_2 (18時)", 3: "SLOT_3 (21時)"}
         weekdays = ["月", "火", "水", "木", "金", "土", "日"]
 
