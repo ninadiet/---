@@ -57,3 +57,4 @@ new_token.txt
 *.pem
 *.key
 *.p12
+auth_member.txt
