@@ -1,5 +1,11 @@
 {
   "interval_days": 3,
-  "last_recycle_date": null,
-  "history": []
+  "last_recycle_date": "2026-10-08",
+  "history": [
+    {
+      "date": "2026-10-08",
+      "post_no": "001",
+      "theme": "16950"
+    }
+  ]
 }
