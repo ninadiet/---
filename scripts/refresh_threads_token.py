@@ -45,10 +45,6 @@ def update_github_secret(new_token: str):
         logger.info("手動でGitHub Secrets を更新してください: THREADS_ACCESS_TOKEN")
         return
 
-    from github import Github
-    g    = Github(GITHUB_TOKEN)
-    repo = g.get_repo(GITHUB_REPO)
-
     try:
         # GitHub Secrets はAPIで更新可能（要admin権限）
         # 暗号化が必要なため libsodium が必要 → 手動更新を案内
@@ -96,9 +92,9 @@ def main():
             f.write(new_token)
         logger.info("new_token.txt に保存しました（GitHub Actionsが読み取ります）")
     finally:
-        # ローカル実行時は即座に削除（GitHub Actions上ではworkflow側でrm -fする）
-        import atexit
-        atexit.register(lambda: os.path.exists(token_path) and os.remove(token_path))
+        # ⚠️ ここで削除しない：後続ステップ（gh secret set）が new_token.txt を読む。
+        #    GitHub Actions上ではworkflow側で rm -f する。
+        pass
     logger.info("=== リフレッシュ完了 ===")
 
 
