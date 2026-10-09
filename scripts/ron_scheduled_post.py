@@ -50,6 +50,7 @@ def _is_transient(exc: Exception) -> bool:
 
 
 SLOT_LABELS = {
+    1: "🌅 07時・朝投稿",
     2: "🌆 18時・夕方投稿",
     3: "🌙 21時・夜投稿",
 }
@@ -161,12 +162,17 @@ def get_slot_text_from_issue(issue_number: int, gh: GitHubIssues, slot_num: int)
 
 
 def check_approved(issue_number: int, gh: GitHubIssues) -> bool:
-    """承認コメントがあるか確認"""
+    """承認コメントがあるか確認（auto-approveのBotコメントも有効）"""
     comments = gh.get_comments(issue_number)
-    return any(
-        "承認" in c.body and c.user.type != "Bot" and "申請" not in c.body
-        for c in comments
-    )
+    for c in comments:
+        body = (c.body or "").strip()
+        if not body:
+            continue
+        if any(ng in body for ng in ["承認申請", "承認しない", "否認", "差し戻し", "保留", "承認待ち"]):
+            continue
+        if "承認" in body:
+            return True
+    return False
 
 
 def find_approved_issue(gh: GitHubIssues) -> object:
@@ -189,11 +195,73 @@ def find_approved_issue(gh: GitHubIssues) -> object:
     return None
 
 
+# ── Threads 1投稿あたりの文字数上限対策（2026-10-09 追加）──
+# Threads は1投稿500文字まで。ライターが ===THREAD=== で分割せず1ブロックに詰めると
+# コンテナ作成が失敗する（10/9 SLOT_3：2つ目が710文字で5xx→ツリー切断）。
+# 投稿直前に、上限超えのブロックを段落→行→文の順で自動分割する。
+# 末尾の「PR」単独行以降（PR表記＋アフィリンク）は必ず最後のブロックに残す。
+THREADS_MAX_CHARS = 480  # 公式上限500に対する安全マージン
+
+
+def _split_sentences(line: str, limit: int) -> list:
+    pieces, cur = [], ""
+    for seg in re.findall(r"[^。！？!?]+[。！？!?]?", line):
+        while len(seg) > limit:  # 句点が無い長文の最終手段
+            if cur:
+                pieces.append(cur)
+                cur = ""
+            pieces.append(seg[:limit])
+            seg = seg[limit:]
+        if cur and len(cur) + len(seg) > limit:
+            pieces.append(cur)
+            cur = ""
+        cur += seg
+    if cur:
+        pieces.append(cur)
+    return pieces
+
+
+def split_long_parts(parts: list, limit: int = THREADS_MAX_CHARS) -> list:
+    out = []
+    for part in parts:
+        if len(part) <= limit:
+            out.append(part)
+            continue
+        total = len(part)
+        tail = ""
+        m = re.search(r"(?m)^[ \t]*(?:【PR】|PR)[ \t]*$", part)
+        if m:
+            tail, part = part[m.start():].strip(), part[:m.start()].rstrip()
+        units = []
+        for para in re.split(r"\n\s*\n", part):
+            for line in para.split("\n"):
+                units.extend(_split_sentences(line, limit) if len(line) > limit else [line])
+            units.append("")  # 段落区切り
+        chunks, cur = [], ""
+        for u in units:
+            add = u if not cur else "\n" + u
+            if cur and len(cur) + len(add) > limit:
+                chunks.append(cur.strip())
+                cur, add = "", u
+            cur += add
+        if cur.strip():
+            chunks.append(cur.strip())
+        if tail:
+            if chunks and len(chunks[-1]) + 2 + len(tail) <= limit:
+                chunks[-1] += "\n\n" + tail
+            else:
+                chunks.append(tail)
+        chunks = [c for c in chunks if c]
+        logger.warning(f"{total}文字のブロックを{len(chunks)}分割しました（上限{limit}）")
+        out.extend(chunks)
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--slot", type=int, required=True, choices=[2, 3],
-        help="スロット番号（2=18時, 3=21時）"
+        "--slot", type=int, required=True, choices=[1, 2, 3],
+        help="スロット番号（1=07時, 2=18時, 3=21時）"
     )
     args = parser.parse_args()
 
@@ -210,7 +278,7 @@ def main():
 
     # Python側の投稿済みチェック（yml側チェックとの2重防止）
     # yml側のgrepがコメント形式にマッチしない場合の保険
-    slot_keyword = "18時" if args.slot == 2 else "21時"
+    slot_keyword = {1: "07時", 2: "18時", 3: "21時"}.get(args.slot, f"SLOT_{args.slot}")
     comments_for_check = gh.get_comments(issue.number)
     already_posted = any(
         slot_keyword in c.body and "投稿完了" in c.body
@@ -244,6 +312,7 @@ def main():
 
     # ツリー投稿
     thread_parts = [p.strip() for p in post_text.split("===THREAD===") if p.strip()]
+    thread_parts = split_long_parts(thread_parts)
     logger.info(f"投稿パーツ数: {len(thread_parts)}")
 
     container_id = create_threads_container(thread_parts[0])
