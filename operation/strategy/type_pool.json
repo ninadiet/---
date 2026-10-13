@@ -41,8 +41,8 @@
       "status": "active",
       "score": null,
       "n": 0,
-      "used": 1,
-      "last_used": "2026-10-09",
+      "used": 2,
+      "last_used": "2026-10-14",
       "bench_reason": ""
     },
     {
@@ -74,8 +74,8 @@
       "status": "active",
       "score": null,
       "n": 0,
-      "used": 3,
-      "last_used": "2026-10-12",
+      "used": 4,
+      "last_used": "2026-10-14",
       "bench_reason": ""
     },
     {
@@ -118,8 +118,8 @@
       "status": "active",
       "score": null,
       "n": 0,
-      "used": 2,
-      "last_used": "2026-10-11",
+      "used": 3,
+      "last_used": "2026-10-14",
       "bench_reason": ""
     }
   ],
@@ -141,12 +141,12 @@
     "w_likes_nf": 0.35
   },
   "daily": {
-    "date": "2026-10-13",
+    "date": "2026-10-14",
     "ids": [
-      "kazoe",
-      "hakken",
-      "rensai"
+      "gyakubari",
+      "hikaku",
+      "urawaza"
     ]
   },
-  "updated": "2026-10-14T04:51:58.730154+09:00"
+  "updated": "2026-10-14T08:50:59.714946+09:00"
 }
