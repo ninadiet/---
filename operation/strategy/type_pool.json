@@ -52,8 +52,8 @@
       "status": "active",
       "score": null,
       "n": 0,
-      "used": 2,
-      "last_used": "2026-10-11",
+      "used": 3,
+      "last_used": "2026-10-13",
       "bench_reason": ""
     },
     {
@@ -96,8 +96,8 @@
       "status": "active",
       "score": null,
       "n": 0,
-      "used": 0,
-      "last_used": "",
+      "used": 1,
+      "last_used": "2026-10-13",
       "bench_reason": ""
     },
     {
@@ -107,8 +107,8 @@
       "status": "active",
       "score": null,
       "n": 0,
-      "used": 1,
-      "last_used": "2026-10-11",
+      "used": 2,
+      "last_used": "2026-10-13",
       "bench_reason": ""
     },
     {
@@ -141,12 +141,12 @@
     "w_likes_nf": 0.35
   },
   "daily": {
-    "date": "2026-10-12",
+    "date": "2026-10-13",
     "ids": [
-      "hikaku",
-      "tejun",
-      "bamen"
+      "kazoe",
+      "hakken",
+      "rensai"
     ]
   },
-  "updated": "2026-10-13T06:44:15.900914+09:00"
+  "updated": "2026-10-13T11:14:01.139150+09:00"
 }
