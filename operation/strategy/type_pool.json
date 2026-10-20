@@ -8,8 +8,8 @@
       "status": "active",
       "score": 65.0,
       "n": 1,
-      "used": 3,
-      "last_used": "2026-10-20",
+      "used": 4,
+      "last_used": "2026-10-21",
       "bench_reason": ""
     },
     {
@@ -52,8 +52,8 @@
       "status": "active",
       "score": 18.8,
       "n": 4,
-      "used": 6,
-      "last_used": "2026-10-19",
+      "used": 7,
+      "last_used": "2026-10-21",
       "bench_reason": ""
     },
     {
@@ -63,8 +63,8 @@
       "status": "active",
       "score": 54.6,
       "n": 4,
-      "used": 5,
-      "last_used": "2026-10-19",
+      "used": 6,
+      "last_used": "2026-10-21",
       "bench_reason": ""
     },
     {
@@ -141,12 +141,12 @@
     "w_likes_nf": 0.35
   },
   "daily": {
-    "date": "2026-10-20",
+    "date": "2026-10-21",
     "ids": [
-      "toikake",
-      "hikaku",
-      "urawaza"
+      "kazoe",
+      "tejun",
+      "toikake"
     ]
   },
-  "updated": "2026-10-21T02:58:33.596721+09:00"
+  "updated": "2026-10-21T08:21:55.593772+09:00"
 }
