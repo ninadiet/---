@@ -312,10 +312,27 @@ _PLACEHOLDER_RX = re.compile(
 )
 
 
+# 2026-10-28 追加：読者向けの「AIへの指示文」の型（「〇〇について調べて」）は意図した穴埋め例。
+#   これを誤検知して10/27は3回差し戻し→リトライ上限→全スロット投稿ゼロになった。
+#   「」『』で囲まれ、かつ依頼形（…て／ください／お願い等）で終わる引用の中だけ除外する。
+#   地の文の穴埋め残り（8/23事故型）は従来どおり弾く。
+_QUOTE_RX = re.compile("[「『]([^「」『』\n]{1,120})[」』]")
+_REQUEST_END_RX = re.compile("(?:て|で|ください|下さい|お願い|おねがい|しよう|してね|して|ます|です)[。！!？?…～〜]*$")
+
+
+def _in_request_quote(text, start, end):
+    for q in _QUOTE_RX.finditer(text):
+        if q.start(1) <= start and end <= q.end(1):
+            return bool(_REQUEST_END_RX.search(q.group(1).strip()))
+    return False
+
+
 def find_placeholders(text):
     """本文に残った伏せ字・雛形記号を、前後の文脈つきで返す"""
     hits = []
     for m in _PLACEHOLDER_RX.finditer(text or ""):
+        if _in_request_quote(text, m.start(), m.end()):
+            continue
         s = max(0, m.start() - 12)
         frag = text[s:m.end() + 12]
         hits.append(" ".join(frag.split()))
