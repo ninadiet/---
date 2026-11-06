@@ -41,8 +41,8 @@
       "status": "active",
       "score": 51.6,
       "n": 9,
-      "used": 13,
-      "last_used": "2026-11-06",
+      "used": 14,
+      "last_used": "2026-11-07",
       "bench_reason": ""
     },
     {
@@ -63,8 +63,8 @@
       "status": "active",
       "score": 43.2,
       "n": 11,
-      "used": 13,
-      "last_used": "2026-11-05",
+      "used": 14,
+      "last_used": "2026-11-07",
       "bench_reason": ""
     },
     {
@@ -74,8 +74,8 @@
       "status": "active",
       "score": 45.8,
       "n": 10,
-      "used": 17,
-      "last_used": "2026-11-06",
+      "used": 18,
+      "last_used": "2026-11-07",
       "bench_reason": ""
     },
     {
@@ -141,12 +141,12 @@
     "w_likes_nf": 0.35
   },
   "daily": {
-    "date": "2026-11-06",
+    "date": "2026-11-07",
     "ids": [
-      "urawaza",
       "gyakubari",
-      "hikaku"
+      "hikaku",
+      "tejun"
     ]
   },
-  "updated": "2026-11-07T04:57:12.905796+09:00"
+  "updated": "2026-11-07T05:38:22.779550+09:00"
 }
