@@ -76,3 +76,6 @@ date,slot,type_id,views,likes,follower_attr,score,flags
 2026-11-09,1,kazoe,1,0,0.0,16.2,NO_FOLLOWER
 2026-11-09,2,gyakubari,17,3,0.0,100.0,NO_FOLLOWER
 2026-11-09,3,tejun,1,0,0.0,10.8,NO_FOLLOWER
+2026-11-10,1,gyakubari,2,0,0.0,32.5,NO_FOLLOWER
+2026-11-10,2,tejun,2,0,0.0,32.5,NO_FOLLOWER
+2026-11-10,3,kazoe,3,0,0.0,32.5,NO_FOLLOWER
