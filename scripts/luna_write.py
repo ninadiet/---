@@ -28,6 +28,7 @@ BUZZ_POSTS_PATH = os.path.join(SCRIPT_DIR, "..", "operation", "knowledge", "kb_s
 from utils import owner_rules, post_history   # 2026-08-24 追加
 from utils import post_guard                       # 2026-09-07（プロンプトの写し落とし）
 from utils import type_engine
+from utils import emotion_hooks                    # 2026-11-19（汎用感情フック100の日替わり候補）
 from utils import cta_engine                       # 2026-09-11（締め方の日替わり）
 from utils import howto_stock                      # 2026-09-12（手の内ストック）                     # 2026-08-25 追加（型の勝ち残りゲーム）
 from utils.voice_rules import extract_voice_suffixes   # 2026-09-07 追加（校閲と同じ抽出を使う）
@@ -512,6 +513,7 @@ def generate_posts(briefing: str, voice_def: str, ref_posts: str, malfoy_feedbac
 ---
 ## バズ構造の型（「型」だけ参考にする。内容は実体験バンクのものを使うこと）
 {ref_posts}
+{emotion_hooks.prompt_block()}
 
 ---
 ## ハーマイオニーのブリーフィング（ネタのヒントとして使う）
