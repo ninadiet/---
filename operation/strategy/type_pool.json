@@ -133,7 +133,7 @@
     "explore_slots": 1,
     "base_window_days": 28,
     "base_min_samples": 3,
-    "relative_win_ratio": 3.0,
+    "relative_win_ratio": 10.0,
     "w_views": 0.5,
     "w_follower": 0.3,
     "w_likes": 0.2,

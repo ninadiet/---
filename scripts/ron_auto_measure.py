@@ -50,14 +50,15 @@ BUZZ_VIEWS_THRESHOLD     = 3000  # 閲覧数バズ閾値（伸びている）
 HIGH_ER_THRESHOLD        = 3.0   # ER%「好調」以上
 GREAT_ER_THRESHOLD       = 5.0   # ER%「大バズ」
 LOW_ER_THRESHOLD         = 1.0   # ER%「要改善」
-MIN_VIEWS_FOR_ER_BUZZ    = 500   # ER基準大バズの最低閲覧数
+MIN_VIEWS_FOR_ER_BUZZ    = 1000  # ER基準大バズの最低閲覧数（閲覧1000未満はバズと呼ばない）
 GOOD_VIEWS_THRESHOLD     = 1000  # 閲覧数「好調」
 LOW_VIEWS_THRESHOLD      = 800   # 閲覧数「要改善」
 FOLLOWER_GROWTH_THRESHOLD = 10   # フォロワー増加「成長日」閾値
 
 # 自分比の勝ち判定に必要な最低閲覧数（2026-11-19 追加）
-# 閲覧2→6件のような極小母数でも「3倍超」になり、偶然の投稿がお手本として保存されていたため。
-MIN_VIEWS_FOR_RELATIVE_WIN = int(os.getenv("MIN_VIEWS_FOR_RELATIVE_WIN", "50"))
+# 閲覧2→6件のような極小母数でも勝ち判定になり、偶然の投稿がお手本として保存されていたため。
+# 運用方針：閲覧の「バズ」＝普段の10倍以上（relative_win_ratio）かつ閲覧1000件以上。
+MIN_VIEWS_FOR_RELATIVE_WIN = int(os.getenv("MIN_VIEWS_FOR_RELATIVE_WIN", "1000"))
 
 # ── バズ知識保管の新基準（ER×閲覧の両方を満たす必要あり） ──
 BUZZ_ER_THRESHOLD   = 2.0   # バズ保管に必要な最低ER%
@@ -373,7 +374,7 @@ def should_save_as_knowledge(likes: int, views: int, er: float, is_follower_grow
     if likes >= BUZZ_LIKES_THRESHOLD:
         return True, "buzz", f"いいね{likes}件バズ"
     if _is_relative_win(views, target_date):
-        return True, "buzz", f"自分の平常時の3倍超の閲覧（{views}件・自分比の勝ち）"
+        return True, "buzz", f"自分の平常時の10倍超の閲覧（{views}件・自分比の勝ち）"
     if views >= BUZZ_VIEWS_THRESHOLD:
         return True, "buzz", f"閲覧{views}件バズ"
     # 閲覧≥1000だがER<2%の投稿は反省サンプルとしてlow_erに記録
