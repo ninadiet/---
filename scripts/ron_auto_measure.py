@@ -55,6 +55,10 @@ GOOD_VIEWS_THRESHOLD     = 1000  # 閲覧数「好調」
 LOW_VIEWS_THRESHOLD      = 800   # 閲覧数「要改善」
 FOLLOWER_GROWTH_THRESHOLD = 10   # フォロワー増加「成長日」閾値
 
+# 自分比の勝ち判定に必要な最低閲覧数（2026-11-19 追加）
+# 閲覧2→6件のような極小母数でも「3倍超」になり、偶然の投稿がお手本として保存されていたため。
+MIN_VIEWS_FOR_RELATIVE_WIN = int(os.getenv("MIN_VIEWS_FOR_RELATIVE_WIN", "50"))
+
 # ── バズ知識保管の新基準（ER×閲覧の両方を満たす必要あり） ──
 BUZZ_ER_THRESHOLD   = 2.0   # バズ保管に必要な最低ER%
 BUZZ_VIEWS_FOR_ER   = 1000  # バズ保管に必要な最低閲覧数
@@ -341,6 +345,8 @@ def _is_relative_win(views: int, target_date: str = "") -> bool:
     立ち上げ期のアカウント（フォロワー数十人）は何ヶ月経っても1件も保存されず、
     学習が永久に始まらなかった（実利用者の実測で確認）。
     自分比の基準を OR で足すことで、規模によらず初週から学習が動く。"""
+    if views < MIN_VIEWS_FOR_RELATIVE_WIN:
+        return False
     try:
         from utils import type_engine
         return type_engine.is_relative_win(views, target_date)
